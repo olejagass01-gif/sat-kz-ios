@@ -63,4 +63,19 @@ document.getElementById('adForm').addEventListener('submit',e=>{
  alert('Готово! Объявление добавлено в демо-просмотр.');
 });
 renderCats();renderAds();
+
+const authModal=document.getElementById('authModal'),profileModal=document.getElementById('profileModal');
+let currentPhone=localStorage.getItem('satkz_phone')||'';
+const phoneInput=document.getElementById('phoneInput');
+function openAuth(){phoneInput.value=currentPhone||'+7 ';authModal.classList.add('open')}
+function openProfile(){profileModal.classList.add('open');const c=document.getElementById('profileContent');if(currentPhone){c.innerHTML='<div class="profile-top"><div class="avatar">👤</div><div><b>Пользователь SAT KZ</b><div class="meta">'+currentPhone+'</div></div></div><div class="profile-row"><span>Мои объявления</span><b>'+ads.filter(a=>a[5]==='mine').length+'</b></div><div class="profile-row"><span>Избранное</span><b>0</b></div><button class="secondary" id="logoutBtn">Выйти из аккаунта</button>';document.getElementById('logoutBtn').onclick=()=>{currentPhone='';localStorage.removeItem('satkz_phone');profileModal.classList.remove('open');openAuth()}}else{c.innerHTML='<div class="empty">Вы ещё не вошли в аккаунт.</div><button class="publish" id="profileLogin">Войти по номеру телефона</button>';document.getElementById('profileLogin').onclick=()=>{profileModal.classList.remove('open');openAuth()}}}
+document.querySelector('.nav button:nth-child(5)').onclick=openProfile;
+document.querySelector('.nav button:nth-child(2)').onclick=()=>alert('Раздел «Избранное» добавим следующим шагом.');
+document.querySelector('.nav button:nth-child(4)').onclick=()=>alert('Сообщения подключим после создания общей базы данных.');
+document.getElementById('closeAuth').onclick=()=>authModal.classList.remove('open');
+document.getElementById('closeProfile').onclick=()=>profileModal.classList.remove('open');
+authModal.addEventListener('click',e=>{if(e.target===authModal)authModal.classList.remove('open')});
+profileModal.addEventListener('click',e=>{if(e.target===profileModal)profileModal.classList.remove('open')});
+document.getElementById('loginBtn').onclick=()=>{const digits=phoneInput.value.replace(/\D/g,'');if(digits.length!==11||!digits.startsWith('7')){alert('Введите номер в формате +7 700 000 00 00');return}currentPhone='+7 '+digits.slice(1,4)+' '+digits.slice(4,7)+' '+digits.slice(7,9)+' '+digits.slice(9,11);try{localStorage.setItem('satkz_phone',currentPhone)}catch(e){}authModal.classList.remove('open');openProfile()};
+
 </script></body></html>
