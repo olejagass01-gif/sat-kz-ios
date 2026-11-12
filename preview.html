@@ -26,25 +26,23 @@
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
 const defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
 let ads;try{const saved=localStorage.getItem('satkz_ads');ads=saved?JSON.parse(saved):defaultAds.slice()}catch(e){ads=defaultAds.slice()}
-function saveAds(){try{localStorage.setItem('satkz_ads',JSON.stringify(ads))}catch(e){alert('Не удалось сохранить данные в Safari. Проверьте настройки приватности браузера.')}}
-let active='Все';
+let favorites=[];try{favorites=JSON.parse(localStorage.getItem('satkz_favs')||'[]')}catch(e){favorites=[]}
+let active='Все', page='home';
 const cats=document.getElementById('cats'),cards=document.getElementById('cards'),q=document.getElementById('q');
-function renderCats(){cats.innerHTML=categories.map(([n,i])=>'<button class="cat '+(active===n?'active':'')+'" data-cat="'+n+'"><i>'+i+'</i>'+n+'</button>').join('');cats.querySelectorAll('button').forEach(b=>b.onclick=()=>{active=active===b.dataset.cat?'Все':b.dataset.cat;renderCats();renderAds()})}
-function renderAds(){let list=ads.filter(a=>(active==='Все'||a[4]===active)&& (a[2]+' '+a[3]).toLowerCase().includes(q.value.toLowerCase()));document.getElementById('count').textContent=list.length+' найдено';cards.innerHTML=list.length?list.map(a=>'<article class="card"><div class="photo">'+a[0]+'</div><div class="info"><div class="price">'+a[1]+'</div><div class="title">'+a[2]+'</div><div class="meta">📍 '+a[3]+' · Сегодня</div></div><div class="heart">♡</div></article>').join(''):'<div class="empty">Ничего не найдено. Попробуйте другой запрос.</div>'}
-q.addEventListener('input',renderAds);document.getElementById('all').onclick=()=>{active='Все';renderCats();renderAds()};
-const modal=document.getElementById('addModal');
-document.querySelector('.nav button:nth-child(3)').onclick=()=>modal.classList.add('open');
+const count=document.getElementById('count'),modal=document.getElementById('addModal');
+function saveAds(){try{localStorage.setItem('satkz_ads',JSON.stringify(ads))}catch(e){}}
+function saveFavs(){try{localStorage.setItem('satkz_favs',JSON.stringify(favorites))}catch(e){}}
+function renderCats(){cats.innerHTML=categories.map(([n,i])=>'<button class="cat '+(active===n?'active':'')+'" data-cat="'+n+'"><i>'+i+'</i>'+n+'</button>').join('');cats.querySelectorAll('button').forEach(b=>b.onclick=()=>{active=active===b.dataset.cat?'Все':b.dataset.cat;page='home';render()})}
+function renderAds(){let list=ads.map((a,i)=>({a,i})).filter(({a,i})=>(page!=='favorites'||favorites.includes(i))&&(active==='Все'||a[4]===active)&&(a[2]+' '+a[3]).toLowerCase().includes(q.value.toLowerCase()));count.textContent=list.length+' найдено';cards.innerHTML=list.length?list.map(({a,i})=>'<article class="card"><div class="photo">'+a[0]+'</div><div class="info"><div class="price">'+a[1]+'</div><div class="title">'+a[2]+'</div><div class="meta">📍 '+a[3]+' · Сегодня</div></div><button class="heart" data-fav="'+i+'" style="border:0;background:none">'+(favorites.includes(i)?'♥':'♡')+'</button></article>').join(''):'<div class="empty">'+(page==='favorites'?'Пока нет избранных объявлений. Нажмите ♡ рядом с понравившимся товаром.':'Ничего не найдено. Попробуйте другой запрос.')+'</div>';cards.querySelectorAll('[data-fav]').forEach(b=>b.onclick=()=>{const i=Number(b.dataset.fav);favorites=favorites.includes(i)?favorites.filter(x=>x!==i):[...favorites,i];saveFavs();renderAds()})}
+function showInfo(title,desc){cats.innerHTML='';cards.innerHTML='<div class="empty" style="padding:40px 12px"><div style="font-size:42px;margin-bottom:12px"> '+(title==='Сообщения'?'💬':'👤')+'</div><b style="font-size:18px;color:#20242b">'+title+'</b><p>'+desc+'</p></div>';count.textContent=''}
+function render(){document.querySelector('.banner').style.display=page==='home'?'flex':'none';document.querySelector('.search').style.display=(page==='home'||page==='favorites')?'flex':'none';document.querySelectorAll('.section').forEach(el=>el.style.display=page==='home'||page==='favorites'?'flex':'none');if(page==='messages')showInfo('Сообщения','Здесь будут ваши переписки с продавцами. Чат появится после подключения сервера.');else if(page==='profile')showInfo('Профиль','Войдите по номеру телефона, чтобы управлять объявлениями. Регистрация пока не подключена.');else{renderCats();renderAds()}document.querySelectorAll('.nav button').forEach((b,i)=>b.classList.toggle('sel',['home','favorites','add','messages','profile'][i]===page))}
+q.addEventListener('input',renderAds);
+document.getElementById('all').onclick=()=>{active='Все';page='home';q.value='';render()};
+document.querySelectorAll('.nav button').forEach((b,i)=>b.onclick=()=>{const p=['home','favorites','add','messages','profile'][i];if(p==='add'){modal.classList.add('open');return}page=p;if(p==='home'){active='Все';q.value=''}render()});
+document.querySelector('.city').onclick=()=>alert('Выбор города появится в следующем обновлении.');
 document.getElementById('closeModal').onclick=()=>modal.classList.remove('open');
 modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open')});
 document.getElementById('adPhoto').addEventListener('change',e=>{document.getElementById('photoName').textContent=e.target.files[0]?.name||''});
-document.getElementById('adForm').addEventListener('submit',e=>{
- e.preventDefault();
- const title=document.getElementById('adTitle').value.trim(),price=Number(document.getElementById('adPrice').value),category=document.getElementById('adCategory').value,city=document.getElementById('adCity').value.trim(),file=document.getElementById('adPhoto').files[0];
- if(!title||!price||!category||!city)return;
- const emoji={'Недвижимость':'🏠','Транспорт':'🚗','Электроника':'📱','Работа':'💼','Для дома':'🛋️','Услуги':'🔧','Одежда':'👕','Животные':'🐾'};
- ads.unshift([emoji[category]||'📦',price.toLocaleString('ru-RU')+' ₸',title,city,category]);saveAds();
- active='Все';q.value='';renderCats();renderAds();modal.classList.remove('open');e.target.reset();document.getElementById('photoName').textContent='';
- alert('Готово! Объявление добавлено в демо-просмотр.');
-});
-renderCats();renderAds();
+document.getElementById('adForm').addEventListener('submit',e=>{e.preventDefault();const title=document.getElementById('adTitle').value.trim(),price=Number(document.getElementById('adPrice').value),category=document.getElementById('adCategory').value,city=document.getElementById('adCity').value.trim();if(!title||!price||!category||!city)return;const emoji={'Недвижимость':'🏠','Транспорт':'🚗','Электроника':'📱','Работа':'💼','Для дома':'🛋️','Услуги':'🔧','Одежда':'👕','Животные':'🐾'};ads.unshift([emoji[category]||'📦',price.toLocaleString('ru-RU')+' ₸',title,city,category]);favorites=favorites.map(i=>i+1);saveAds();saveFavs();active='Все';page='home';q.value='';render();modal.classList.remove('open');e.target.reset();document.getElementById('photoName').textContent='';alert('Объявление добавлено в демо-просмотр.')});
+render();
 </script></body></html>
