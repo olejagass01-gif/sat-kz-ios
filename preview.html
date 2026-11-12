@@ -9,6 +9,18 @@
 <div class="section"><h2>Категории</h2><button id="all">Все объявления</button></div>
 <div class="cats" id="cats"></div>
 <div class="section"><h2>Свежие объявления</h2><small id="count" style="color:#9aa1ac">4 найдено</small></div><div class="cards" id="cards"></div></main>
+
+<div class="modal" id="addModal"><section class="sheet"><div class="sheethead"><h2>Новое объявление</h2><button class="close" id="closeModal" type="button">×</button></div>
+<form id="adForm">
+<label class="field"><span>Название объявления *</span><input id="adTitle" required maxlength="80" placeholder="Например, iPhone 14 Pro"></label>
+<label class="field"><span>Цена в тенге *</span><input id="adPrice" type="number" min="1" required placeholder="Например, 280000"></label>
+<label class="field"><span>Категория *</span><select id="adCategory" required><option value="">Выберите категорию</option><option>Недвижимость</option><option>Транспорт</option><option>Электроника</option><option>Работа</option><option>Для дома</option><option>Услуги</option><option>Одежда</option><option>Животные</option></select></label>
+<label class="field"><span>Город *</span><input id="adCity" required placeholder="Например, Астана"></label>
+<label class="field"><span>Описание</span><textarea id="adDescription" placeholder="Расскажите подробнее о товаре"></textarea></label>
+<label class="field"><span>Фотография</span><input id="adPhoto" type="file" accept="image/*"><div class="photo-preview" id="photoName"></div></label>
+<div class="hint">Это демонстрация: объявление добавится только на этой странице.</div><button class="publish" type="submit">Опубликовать объявление</button>
+</form></section></div>
+
 <nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
 <script>
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
