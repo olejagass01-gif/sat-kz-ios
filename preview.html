@@ -40,9 +40,9 @@
 \n<nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
 <script>
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
-const defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
-let ads;try{const saved=localStorage.getItem('satkz_ads');ads=saved?JSON.parse(saved):defaultAds.slice()}catch(e){ads=defaultAds.slice()}
-function saveAds(){try{localStorage.setItem('satkz_ads',JSON.stringify(ads))}catch(e){alert('Не удалось сохранить данные в Safari. Проверьте настройки приватности браузера.')}}
+function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}\nfunction safeSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}\nfunction safeRemove(k){try{localStorage.removeItem(k)}catch(e){}}\nconst defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
+let ads;try{const saved=safeGet('satkz_ads');ads=saved?JSON.parse(saved):defaultAds.slice()}catch(e){ads=defaultAds.slice()}
+function saveAds(){if(!safeSet('satkz_ads',JSON.stringify(ads)))alert('Safari не разрешил сохранить объявление на этом устройстве.');}
 let active='Все';
 const cats=document.getElementById('cats'),cards=document.getElementById('cards'),q=document.getElementById('q');
 function renderCats(){cats.innerHTML=categories.map(([n,i])=>'<button class="cat '+(active===n?'active':'')+'" data-cat="'+n+'"><i>'+i+'</i>'+n+'</button>').join('');cats.querySelectorAll('button').forEach(b=>b.onclick=()=>{active=active===b.dataset.cat?'Все':b.dataset.cat;renderCats();renderAds()})}
@@ -65,10 +65,10 @@ document.getElementById('adForm').addEventListener('submit',e=>{
 renderCats();renderAds();
 
 const authModal=document.getElementById('authModal'),profileModal=document.getElementById('profileModal');
-let currentPhone=localStorage.getItem('satkz_phone')||'';
+let currentPhone=safeGet('satkz_phone')||'';
 const phoneInput=document.getElementById('phoneInput');
 function openAuth(){phoneInput.value=currentPhone||'+7 ';authModal.classList.add('open')}
-function openProfile(){profileModal.classList.add('open');const c=document.getElementById('profileContent');if(currentPhone){c.innerHTML='<div class="profile-top"><div class="avatar">👤</div><div><b>Пользователь SAT KZ</b><div class="meta">'+currentPhone+'</div></div></div><div class="profile-row"><span>Мои объявления</span><b>'+ads.filter(a=>a[5]==='mine').length+'</b></div><div class="profile-row"><span>Избранное</span><b>0</b></div><button class="secondary" id="logoutBtn">Выйти из аккаунта</button>';document.getElementById('logoutBtn').onclick=()=>{currentPhone='';localStorage.removeItem('satkz_phone');profileModal.classList.remove('open');openAuth()}}else{c.innerHTML='<div class="empty">Вы ещё не вошли в аккаунт.</div><button class="publish" id="profileLogin">Войти по номеру телефона</button>';document.getElementById('profileLogin').onclick=()=>{profileModal.classList.remove('open');openAuth()}}}
+function openProfile(){profileModal.classList.add('open');const c=document.getElementById('profileContent');if(currentPhone){c.innerHTML='<div class="profile-top"><div class="avatar">👤</div><div><b>Пользователь SAT KZ</b><div class="meta">'+currentPhone+'</div></div></div><div class="profile-row"><span>Мои объявления</span><b>'+ads.filter(a=>a[5]==='mine').length+'</b></div><div class="profile-row"><span>Избранное</span><b>0</b></div><button class="secondary" id="logoutBtn">Выйти из аккаунта</button>';document.getElementById('logoutBtn').onclick=()=>{currentPhone='';safeRemove('satkz_phone');profileModal.classList.remove('open');openAuth()}}else{c.innerHTML='<div class="empty">Вы ещё не вошли в аккаунт.</div><button class="publish" id="profileLogin">Войти по номеру телефона</button>';document.getElementById('profileLogin').onclick=()=>{profileModal.classList.remove('open');openAuth()}}}
 document.querySelector('.nav button:nth-child(5)').onclick=openProfile;
 document.querySelector('.nav button:nth-child(2)').onclick=()=>alert('Раздел «Избранное» добавим следующим шагом.');
 document.querySelector('.nav button:nth-child(4)').onclick=()=>alert('Сообщения подключим после создания общей базы данных.');
@@ -76,6 +76,6 @@ document.getElementById('closeAuth').onclick=()=>authModal.classList.remove('ope
 document.getElementById('closeProfile').onclick=()=>profileModal.classList.remove('open');
 authModal.addEventListener('click',e=>{if(e.target===authModal)authModal.classList.remove('open')});
 profileModal.addEventListener('click',e=>{if(e.target===profileModal)profileModal.classList.remove('open')});
-document.getElementById('loginBtn').onclick=()=>{const digits=phoneInput.value.replace(/\D/g,'');if(digits.length!==11||!digits.startsWith('7')){alert('Введите номер в формате +7 700 000 00 00');return}currentPhone='+7 '+digits.slice(1,4)+' '+digits.slice(4,7)+' '+digits.slice(7,9)+' '+digits.slice(9,11);try{localStorage.setItem('satkz_phone',currentPhone)}catch(e){}authModal.classList.remove('open');openProfile()};
+document.getElementById('loginBtn').onclick=()=>{const digits=phoneInput.value.replace(/\D/g,'');if(digits.length!==11||!digits.startsWith('7')){alert('Введите номер в формате +7 700 000 00 00');return}currentPhone='+7 '+digits.slice(1,4)+' '+digits.slice(4,7)+' '+digits.slice(7,9)+' '+digits.slice(9,11);safeSet('satkz_phone',currentPhone)authModal.classList.remove('open');openProfile()};
 
 </script></body></html>
