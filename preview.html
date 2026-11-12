@@ -24,7 +24,9 @@
 <nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
 <script>
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
-const ads=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
+const defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
+let ads;try{const saved=localStorage.getItem('satkz_ads');ads=saved?JSON.parse(saved):defaultAds.slice()}catch(e){ads=defaultAds.slice()}
+function saveAds(){try{localStorage.setItem('satkz_ads',JSON.stringify(ads))}catch(e){alert('Не удалось сохранить данные в Safari. Проверьте настройки приватности браузера.')}}
 let active='Все';
 const cats=document.getElementById('cats'),cards=document.getElementById('cards'),q=document.getElementById('q');
 function renderCats(){cats.innerHTML=categories.map(([n,i])=>'<button class="cat '+(active===n?'active':'')+'" data-cat="'+n+'"><i>'+i+'</i>'+n+'</button>').join('');cats.querySelectorAll('button').forEach(b=>b.onclick=()=>{active=active===b.dataset.cat?'Все':b.dataset.cat;renderCats();renderAds()})}
@@ -40,7 +42,7 @@ document.getElementById('adForm').addEventListener('submit',e=>{
  const title=document.getElementById('adTitle').value.trim(),price=Number(document.getElementById('adPrice').value),category=document.getElementById('adCategory').value,city=document.getElementById('adCity').value.trim(),file=document.getElementById('adPhoto').files[0];
  if(!title||!price||!category||!city)return;
  const emoji={'Недвижимость':'🏠','Транспорт':'🚗','Электроника':'📱','Работа':'💼','Для дома':'🛋️','Услуги':'🔧','Одежда':'👕','Животные':'🐾'};
- ads.unshift([emoji[category]||'📦',price.toLocaleString('ru-RU')+' ₸',title,city,category]);
+ ads.unshift([emoji[category]||'📦',price.toLocaleString('ru-RU')+' ₸',title,city,category]);saveAds();
  active='Все';q.value='';renderCats();renderAds();modal.classList.remove('open');e.target.reset();document.getElementById('photoName').textContent='';
  alert('Готово! Объявление добавлено в демо-просмотр.');
 });
