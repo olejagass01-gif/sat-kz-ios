@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   StatusBar,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -43,12 +44,16 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Все");
   const [tab, setTab] = useState("Главная");
+  const [selectedCity, setSelectedCity] = useState("Все города");
+  const cities = ["Все города", "Астана", "Алматы", "Шымкент", "Караганда", "Актобе", "Тараз", "Павлодар", "Атырау", "Актау", "Костанай", "Семей", "Туркестан"];
+  const chooseCity = () => Alert.alert("Выберите город", "Показывать объявления из выбранного города", cities.map((city) => ({ text: city === selectedCity ? "✓ " + city : city, onPress: () => setSelectedCity(city) })).concat([{ text: "Отмена", style: "cancel" as const }]));
 
   const filtered = useMemo(() => listings.filter((item) => {
     const matchesQuery = (item.title + " " + item.city).toLowerCase().includes(query.toLowerCase());
     const matchesCategory = activeCategory === "Все" || item.category === activeCategory;
-    return matchesQuery && matchesCategory;
-  }), [query, activeCategory]);
+    const matchesCity = selectedCity === "Все города" || item.city === selectedCity;
+    return matchesQuery && matchesCategory && matchesCity;
+  }), [query, activeCategory, selectedCity]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,9 +63,9 @@ export default function App() {
           <Text style={styles.logo}>SAT<Text style={styles.logoAccent}> KZ</Text></Text>
           <Text style={styles.subtitle}>Покупай. Продавай. Просто.</Text>
         </View>
-        <Pressable style={styles.cityButton} onPress={() => {}}>
+        <Pressable style={styles.cityButton} onPress={chooseCity}>
           <Ionicons name="location-outline" size={17} color="#20242B" />
-          <Text style={styles.cityText}>Астана</Text>
+          <Text style={styles.cityText}>{selectedCity}</Text>
           <Ionicons name="chevron-down" size={14} color="#20242B" />
         </Pressable>
       </View>
