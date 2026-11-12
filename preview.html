@@ -22,7 +22,7 @@
 <div class="hint">Это демонстрация: объявление добавится только на этой странице.</div><button class="publish" type="submit">Опубликовать объявление</button>
 </form></section></div>
 
-<div class="modal" id="cityModal"><section class="sheet"><div class="sheethead"><h2>Выберите город</h2><button class="close" id="closeCity" type="button">×</button></div><div id="cityOptions"></div></section></div>
+<div class="modal" id="cityModal"><section class="sheet"><div class="sheethead"><h2>Выберите город</h2><button class="close" id="closeCity" type="button">×</button></div><p class="profile-muted" style="margin:0 0 8px">Выберите город — на главной останутся объявления из этого города. Чтобы видеть все объявления, выберите «Все города».</p><div id="cityOptions"></div></section></div>
 <nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
 <script>
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
@@ -31,7 +31,7 @@ let ads;try{const saved=localStorage.getItem('satkz_ads');ads=saved?JSON.parse(s
 let favorites=[];try{favorites=JSON.parse(localStorage.getItem('satkz_favs')||'[]')}catch(e){favorites=[]}
 let profile=null;try{profile=JSON.parse(localStorage.getItem('satkz_profile')||'null')}catch(e){profile=null}
 let active='Все', page='home';
- const cities=['Все города','Астана','Алматы','Шымкент','Караганда','Актобе','Тараз','Павлодар','Усть-Каменогорск','Семей','Атырау','Костанай','Кызылорда','Уральск','Петропавловск','Актау','Талдыкорган','Туркестан','Кокшетау','Жезказган','Экибастуз'];
+ const cities=['Все города','Астана','Алматы','Шымкент','Караганда','Актобе','Тараз','Павлодар','Усть-Каменогорск','Семей','Атырау','Костанай','Кызылорда','Уральск','Петропавловск','Актау','Талдыкорган','Туркестан','Кокшетау','Жезказган','Экибастуз','Темиртау','Рудный','Балхаш','Жанаозен','Сатпаев','Кентау','Арыс','Риддер','Степногорск','Щучинск','Жаркент'];
  let selectedCity='Все города';try{selectedCity=localStorage.getItem('satkz_city')||'Все города'}catch(e){}
 const cats=document.getElementById('cats'),cards=document.getElementById('cards'),q=document.getElementById('q');
 const count=document.getElementById('count'),modal=document.getElementById('addModal');
