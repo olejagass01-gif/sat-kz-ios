@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SAT KZ",
+    "slug": "sat-kz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "kz.satkz.app"
+    },
+    "android": {
+      "package": "kz.satkz.app"
+    }
+  }
+}
