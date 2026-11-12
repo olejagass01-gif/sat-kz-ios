@@ -37,10 +37,14 @@
 <div class="modal" id="profileModal"><section class="sheet"><div class="sheethead"><h2>Личный кабинет</h2><button class="close" id="closeProfile" type="button">×</button></div>
 <div id="profileContent"></div>
 </section></div>
-\n<nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
+
+<nav class="nav"><button class="sel"><b>⌂</b>Главная</button><button><b>♡</b>Избранное</button><button><b style="color:#f36b32">⊕</b>Добавить</button><button><b>▤</b>Сообщения</button><button><b>♙</b>Профиль</button></nav>
 <script>
 const categories=[['Недвижимость','⌂'],['Транспорт','🚗'],['Электроника','▣'],['Работа','▤'],['Для дома','🛋'],['Услуги','🔧'],['Одежда','♧'],['Животные','🐾']];
-function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}\nfunction safeSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}\nfunction safeRemove(k){try{localStorage.removeItem(k)}catch(e){}}\nconst defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
+function safeGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function safeSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}
+function safeRemove(k){try{localStorage.removeItem(k)}catch(e){}}
+const defaultAds=[['📱','280 000 ₸','iPhone 14 Pro, 256 GB','Астана','Электроника'],['🏠','25 000 000 ₸','Уютная 2-комнатная квартира','Алматы','Недвижимость'],['🚘','10 500 000 ₸','Toyota Camry 2018','Караганда','Транспорт'],['💻','350 000 ₸','Игровой ноутбук ASUS','Астана','Электроника']];
 let ads;try{const saved=safeGet('satkz_ads');ads=saved?JSON.parse(saved):defaultAds.slice()}catch(e){ads=defaultAds.slice()}
 function saveAds(){if(!safeSet('satkz_ads',JSON.stringify(ads)))alert('Safari не разрешил сохранить объявление на этом устройстве.');}
 let active='Все';
