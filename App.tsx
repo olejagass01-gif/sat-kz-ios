@@ -299,21 +299,48 @@ export default function App() {
 
   const loadUnreadCount = async () => {
     if (!session?.user?.id) { setUnreadCount(0); return; }
-    const { count, error } = await supabase
+    const userId = session.user.id;
+    const { data: chats, error: chatsError } = await supabase
+      .from("conversations")
+      .select("id, buyer_id, seller_id, buyer_last_read_at, seller_last_read_at");
+    if (chatsError) return;
+    const rows = chats || [];
+    if (!rows.length) { setUnreadCount(0); return; }
+    const { data: incoming, error: messagesError } = await supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("is_read", false)
-      .neq("sender_id", session.user.id);
-    if (!error) setUnreadCount(count || 0);
+      .select("conversation_id, sender_id, created_at")
+      .in("conversation_id", rows.map((chat: any) => chat.id))
+      .neq("sender_id", userId);
+    if (messagesError) return;
+    const chatById: Record<string, any> = {};
+    rows.forEach((chat: any) => { chatById[chat.id] = chat; });
+    const unread = (incoming || []).filter((message: any) => {
+      const chat = chatById[message.conversation_id];
+      if (!chat) return false;
+      const lastRead = chat.buyer_id === userId
+        ? chat.buyer_last_read_at
+        : chat.seller_last_read_at;
+      return !lastRead || new Date(message.created_at).getTime() > new Date(lastRead).getTime();
+    }).length;
+    setUnreadCount(unread);
   };
 
   const markConversationRead = async (conversationId: string) => {
     if (!session?.user?.id) return;
-    await supabase.from("messages").update({ is_read: true })
-      .eq("conversation_id", conversationId)
-      .neq("sender_id", session.user.id)
-      .eq("is_read", false);
-    await loadUnreadCount();
+    const { data: chat, error } = await supabase
+      .from("conversations")
+      .select("buyer_id, seller_id")
+      .eq("id", conversationId)
+      .single();
+    if (error || !chat) return;
+    const readField = chat.buyer_id === session.user.id
+      ? "buyer_last_read_at"
+      : "seller_last_read_at";
+    const { error: updateError } = await supabase
+      .from("conversations")
+      .update({ [readField]: new Date().toISOString() })
+      .eq("id", conversationId);
+    if (!updateError) await loadUnreadCount();
   };
 
   const loadConversations = async () => {
@@ -324,7 +351,7 @@ export default function App() {
     setChatLoading(true);
     const { data, error } = await supabase
       .from("conversations")
-      .select("id, ad_id, buyer_id, seller_id, created_at")
+      .select("id, ad_id, buyer_id, seller_id, created_at, buyer_last_read_at, seller_last_read_at")
       .order("created_at", { ascending: false });
     if (error) {
       setChatLoading(false);
