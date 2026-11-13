@@ -124,6 +124,10 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileCity, setProfileCity] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+  const [profilePhoto, setProfilePhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
@@ -162,8 +166,12 @@ export default function App() {
   useEffect(() => {
     if (!session?.user?.id) return;
     let active = true;
-    supabase.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle().then(({ data }) => {
-      if (active && data?.display_name) setProfileName(data.display_name);
+    supabase.from("profiles").select("display_name, phone, city, avatar_url").eq("id", session.user.id).maybeSingle().then(({ data }) => {
+      if (!active || !data) return;
+      if (data.display_name) setProfileName(data.display_name);
+      setProfilePhone(data.phone || "");
+      setProfileCity(data.city || "");
+      setProfileAvatarUrl(data.avatar_url || "");
     });
     return () => { active = false; };
   }, [session?.user?.id]);
@@ -604,6 +612,16 @@ export default function App() {
     else Alert.alert("Вы вышли", "Вы вышли из аккаунта SAT KZ.");
   };
 
+  const chooseProfilePhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]) setProfilePhoto(result.assets[0]);
+  };
+
   const saveProfileName = async () => {
     const cleanName = profileName.trim();
     if (!cleanName) {
@@ -612,25 +630,42 @@ export default function App() {
     }
     if (!session?.user?.id) return;
     setProfileSaving(true);
-    const { data, error } = await supabase.auth.updateUser({ data: { display_name: cleanName } });
-    if (error) {
+    let nextAvatarUrl = profileAvatarUrl;
+    try {
+      if (profilePhoto) {
+        const response = await fetch(profilePhoto.uri);
+        const blob = await response.blob();
+        const ext = (profilePhoto.fileName?.split(".").pop() || "jpg").toLowerCase();
+        const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("profile-photos").upload(path, blob, {
+          contentType: profilePhoto.mimeType || "image/jpeg",
+          upsert: true,
+        });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage.from("profile-photos").getPublicUrl(path);
+        nextAvatarUrl = publicData.publicUrl;
+      }
+      const { data, error } = await supabase.auth.updateUser({ data: { display_name: cleanName } });
+      if (error) throw error;
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: session.user.id,
+        display_name: cleanName,
+        phone: profilePhone.trim() || null,
+        city: profileCity.trim() || null,
+        avatar_url: nextAvatarUrl || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+      if (profileError) throw profileError;
+      setProfileAvatarUrl(nextAvatarUrl);
+      setProfilePhoto(null);
+      setSession((current: any) => current ? { ...current, user: data.user } : current);
+      setProfileEditing(false);
+      Alert.alert("Готово", "Данные профиля сохранены.");
+    } catch (error: any) {
+      Alert.alert("Не удалось сохранить", error?.message || "Проверьте подключение и попробуйте ещё раз.");
+    } finally {
       setProfileSaving(false);
-      Alert.alert("Не удалось сохранить", error.message);
-      return;
     }
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: session.user.id,
-      display_name: cleanName,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "id" });
-    setProfileSaving(false);
-    if (profileError) {
-      Alert.alert("Не удалось сохранить имя для чатов", profileError.message);
-      return;
-    }
-    setSession((current: any) => current ? { ...current, user: data.user } : current);
-    setProfileEditing(false);
-    Alert.alert("Готово", "Имя профиля сохранено и будет отображаться в переписках.");
   };
 
   const submitAd = async () => {
@@ -974,30 +1009,39 @@ export default function App() {
           {session?.user ? (
             <>
               <View style={styles.profileCard}>
-                <Ionicons name="person-circle-outline" size={56} color="#F36B32" />
+                {profilePhoto?.uri || profileAvatarUrl ? (
+                  <Image source={{ uri: profilePhoto?.uri || profileAvatarUrl }} style={{ width: 88, height: 88, borderRadius: 44, marginBottom: 10 }} />
+                ) : (
+                  <Ionicons name="person-circle-outline" size={76} color="#F36B32" />
+                )}
                 <Text style={styles.profileEmail}>{profileName || "Пользователь SAT KZ"}</Text>
                 <Text style={{ color: "#8B929D", fontSize: 12, marginBottom: 12 }}>{session.user.email || session.user.phone || ""}</Text>
-                {profileName.trim() && !profileEditing ? (
+                {profileEditing ? (
                   <>
-                    <Text style={{ color: "#8B929D", fontSize: 12, marginTop: 4 }}>Имя профиля</Text>
-                    <Text style={{ color: "#20242B", fontSize: 18, fontWeight: "800", marginTop: 5 }}>{profileName}</Text>
-                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={() => setProfileEditing(true)}>
-                      <Text style={styles.publishButtonText}>Изменить имя</Text>
+                    <Pressable onPress={chooseProfilePhoto} style={{ alignSelf: "stretch", borderWidth: 1, borderColor: "#F36B32", borderRadius: 12, padding: 13, alignItems: "center", marginBottom: 8 }}>
+                      <Text style={{ color: "#F36B32", fontWeight: "800" }}>{profilePhoto || profileAvatarUrl ? "Изменить фотографию" : "Добавить фотографию"}</Text>
+                    </Pressable>
+                    <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left" }]}>Имя</Text>
+                    <TextInput value={profileName} onChangeText={setProfileName} placeholder="Как вас называть?" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch" }]} maxLength={40} />
+                    <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left" }]}>Телефон</Text>
+                    <TextInput value={profilePhone} onChangeText={setProfilePhone} placeholder="+7 700 000 00 00" placeholderTextColor="#9AA1AC" keyboardType="phone-pad" style={[styles.formInput, { alignSelf: "stretch" }]} maxLength={20} />
+                    <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left" }]}>Город</Text>
+                    <TextInput value={profileCity} onChangeText={setProfileCity} placeholder="Ваш город" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch" }]} maxLength={50} />
+                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 16 }]} onPress={saveProfileName} disabled={profileSaving}>
+                      {profileSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить профиль</Text>}
+                    </Pressable>
+                    <Pressable onPress={() => { setProfileEditing(false); setProfilePhoto(null); }} style={{ alignSelf: "center", padding: 10 }}>
+                      <Text style={{ color: "#68707C", fontSize: 12, fontWeight: "700" }}>Отмена</Text>
                     </Pressable>
                   </>
                 ) : (
                   <>
-                    <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left", marginTop: 4 }]}>Имя профиля</Text>
-                    <TextInput value={profileName} onChangeText={setProfileName} placeholder="Как вас называть?" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch", backgroundColor: "#FFFFFF" }]} maxLength={40} />
-                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={saveProfileName} disabled={profileSaving}>
-                      {profileSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить имя</Text>}
+                    <Text style={{ color: "#20242B", fontSize: 16, fontWeight: "800", marginTop: 4 }}>{profileName || "Имя не указано"}</Text>
+                    <Text style={{ color: "#68707C", fontSize: 13, marginTop: 6 }}>{profilePhone || "Телефон не указан"}</Text>
+                    <Text style={{ color: "#68707C", fontSize: 13, marginTop: 4 }}>{profileCity || "Город не указан"}</Text>
+                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 14 }]} onPress={() => setProfileEditing(true)}>
+                      <Text style={styles.publishButtonText}>Редактировать профиль</Text>
                     </Pressable>
-                    {profileName.trim() ? (
-                      <Pressable onPress={() => setProfileEditing(false)} style={{ alignSelf: "center", padding: 10 }}>
-                        <Text style={{ color: "#68707C", fontSize: 12, fontWeight: "700" }}>Отмена</Text>
-                      </Pressable>
-                    ) : null}
-                    <Text style={[styles.formHint, { marginTop: 12, marginBottom: 0 }]}>Имя будет отображаться в вашем профиле SAT KZ.</Text>
                   </>
                 )}
               </View>
