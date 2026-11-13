@@ -132,6 +132,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     loadListings();
@@ -296,6 +297,25 @@ export default function App() {
     setChatMessages(data || []);
   };
 
+  const loadUnreadCount = async () => {
+    if (!session?.user?.id) { setUnreadCount(0); return; }
+    const { count, error } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("is_read", false)
+      .neq("sender_id", session.user.id);
+    if (!error) setUnreadCount(count || 0);
+  };
+
+  const markConversationRead = async (conversationId: string) => {
+    if (!session?.user?.id) return;
+    await supabase.from("messages").update({ is_read: true })
+      .eq("conversation_id", conversationId)
+      .neq("sender_id", session.user.id)
+      .eq("is_read", false);
+    await loadUnreadCount();
+  };
+
   const loadConversations = async () => {
     if (!session?.user?.id) {
       setConversations([]);
@@ -336,6 +356,7 @@ export default function App() {
     });
     setChatLoading(true);
     await loadChatMessages(conversation.id);
+    await markConversationRead(conversation.id);
     setChatLoading(false);
   };
 
@@ -356,11 +377,19 @@ export default function App() {
     setChatMessages((current) => [...current, data]);
     setChatDraft("");
     loadConversations();
+    loadUnreadCount();
   };
 
   useEffect(() => {
     if (tab === "Сообщения" && session?.user?.id) loadConversations();
+    if (session?.user?.id) loadUnreadCount();
   }, [tab, session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const timer = setInterval(loadUnreadCount, 8000);
+    return () => clearInterval(timer);
+  }, [session?.user?.id]);
 
   const signInWithGoogle = async () => {
     setAuthBusy(true);
@@ -1052,11 +1081,16 @@ export default function App() {
             style={styles.tabItem}
             onPress={() => setTab(label)}
           >
-            <Ionicons
-              name={icon}
-              size={label === "Добавить" ? 29 : 22}
-              color={tab === label ? "#F36B32" : "#8B929D"}
-            />
+            <View style={{ position: "relative" }}>
+              <Ionicons
+                name={icon}
+                size={label === "Добавить" ? 29 : 22}
+                color={tab === label ? "#F36B32" : "#8B929D"}
+              />
+              {label === "Сообщения" && unreadCount > 0 ? (
+                <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text></View>
+              ) : null}
+            </View>
             <Text
               style={[
                 styles.tabLabel,
@@ -1262,6 +1296,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FFFFFF",
   },
+  unreadBadge: { position: "absolute", top: -7, right: -12, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#E53935", alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 1, borderColor: "#FFFFFF" },
+  unreadBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
   tabItem: {
     flex: 1,
     alignItems: "center",
