@@ -341,22 +341,27 @@ export default function App() {
       return;
     }
     setReportSaving(true);
-    const { error } = await supabase.from("ad_reports").insert({
-      ad_id: selectedListing.id,
-      reporter_id: session.user.id,
-      reason,
-    });
-    setReportSaving(false);
-    if (error) {
-      if (error.code === "23505") {
-        Alert.alert("Уже отправлено", "Вы уже жаловались на это объявление.");
-      } else {
-        Alert.alert("Ошибка", "Не удалось отправить жалобу. Попробуйте позже.");
+    try {
+      const { error } = await supabase.from("ad_reports").insert({
+        ad_id: selectedListing.id,
+        reporter_id: session.user.id,
+        reason,
+      });
+      if (error) {
+        if (error.code === "23505") {
+          Alert.alert("Уже отправлено", "Вы уже жаловались на это объявление.");
+        } else {
+          Alert.alert("Ошибка отправки жалобы", error.message || error.code || "Неизвестная ошибка");
+        }
+        return;
       }
-      return;
+      setReportReason(null);
+      Alert.alert("Жалоба отправлена", "Спасибо! Мы проверим это объявление.");
+    } catch (error: any) {
+      Alert.alert("Ошибка отправки жалобы", error?.message || "Не удалось связаться с сервером.");
+    } finally {
+      setReportSaving(false);
     }
-    setReportReason(null);
-    Alert.alert("Жалоба отправлена", "Спасибо! Мы проверим это объявление.");
   };
 
   const showReportOptions = () => {
