@@ -97,6 +97,13 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState("Все");
   const [tab, setTab] = useState("Главная");
   const [selectedCity, setSelectedCity] = useState("Все города");
+  const [adTitle, setAdTitle] = useState("");
+  const [adDescription, setAdDescription] = useState("");
+  const [adPrice, setAdPrice] = useState("");
+  const [adCity, setAdCity] = useState("Астана");
+  const [adCategory, setAdCategory] = useState("Недвижимость");
+  const [adPhone, setAdPhone] = useState("");
+  const [savingAd, setSavingAd] = useState(false);
 
   useEffect(() => {
     loadListings();
@@ -134,6 +141,51 @@ export default function App() {
 
     setListings(formatted);
     setLoading(false);
+  };
+
+  const submitAd = async () => {
+    const cleanTitle = adTitle.trim();
+    const cleanPhone = adPhone.trim();
+
+    if (!cleanTitle || !adDescription.trim() || !adPrice.trim() || !cleanPhone) {
+      Alert.alert("Заполните форму", "Укажите название, описание, цену и номер телефона.");
+      return;
+    }
+
+    const numericPrice = Number(adPrice.replace(/\\s/g, "").replace(",", "."));
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      Alert.alert("Неверная цена", "Введите цену числом, например 15000.");
+      return;
+    }
+
+    setSavingAd(true);
+    const { error } = await supabase.from("ads").insert({
+      title: cleanTitle,
+      description: adDescription.trim(),
+      price: numericPrice,
+      city: adCity,
+      category: adCategory,
+      phone: cleanPhone,
+    });
+
+    setSavingAd(false);
+    if (error) {
+      Alert.alert(
+        "Не удалось опубликовать",
+        error.code === "42501"
+          ? "База данных пока запрещает публикацию объявлений. Следующим шагом настроим безопасный доступ."
+          : error.message
+      );
+      return;
+    }
+
+    setAdTitle("");
+    setAdDescription("");
+    setAdPrice("");
+    setAdPhone("");
+    await loadListings();
+    setTab("Главная");
+    Alert.alert("Готово", "Объявление опубликовано.");
   };
 
   const chooseCity = () =>
@@ -185,6 +237,7 @@ export default function App() {
         </Pressable>
       </View>
 
+      {tab === "Главная" ? (
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -305,6 +358,114 @@ export default function App() {
           )}
         </View>
       </ScrollView>
+      ) : tab === "Добавить" ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.formContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.formTitle}>Новое объявление</Text>
+          <Text style={styles.formHint}>Расскажите покупателям, что вы продаёте</Text>
+
+          <Text style={styles.fieldLabel}>Название *</Text>
+          <TextInput
+            value={adTitle}
+            onChangeText={setAdTitle}
+            placeholder="Например, iPhone 13"
+            placeholderTextColor="#9AA1AC"
+            style={styles.formInput}
+            maxLength={90}
+          />
+
+          <Text style={styles.fieldLabel}>Описание *</Text>
+          <TextInput
+            value={adDescription}
+            onChangeText={setAdDescription}
+            placeholder="Состояние, характеристики и подробности"
+            placeholderTextColor="#9AA1AC"
+            style={[styles.formInput, styles.descriptionInput]}
+            multiline
+            textAlignVertical="top"
+            maxLength={1500}
+          />
+
+          <Text style={styles.fieldLabel}>Цена, ₸ *</Text>
+          <TextInput
+            value={adPrice}
+            onChangeText={setAdPrice}
+            placeholder="Например, 15000"
+            placeholderTextColor="#9AA1AC"
+            style={styles.formInput}
+            keyboardType="decimal-pad"
+          />
+
+          <Text style={styles.fieldLabel}>Категория *</Text>
+          <View style={styles.choiceWrap}>
+            {categories.map((item) => (
+              <Pressable
+                key={item.name}
+                onPress={() => setAdCategory(item.name)}
+                style={[styles.choiceChip, adCategory === item.name && styles.choiceChipActive]}
+              >
+                <Text style={[styles.choiceText, adCategory === item.name && styles.choiceTextActive]}>
+                  {item.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Город *</Text>
+          <View style={styles.choiceWrap}>
+            {cities.filter((city) => city !== "Все города").map((city) => (
+              <Pressable
+                key={city}
+                onPress={() => setAdCity(city)}
+                style={[styles.choiceChip, adCity === city && styles.choiceChipActive]}
+              >
+                <Text style={[styles.choiceText, adCity === city && styles.choiceTextActive]}>
+                  {city}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Номер телефона *</Text>
+          <TextInput
+            value={adPhone}
+            onChangeText={setAdPhone}
+            placeholder="+7 777 000 00 00"
+            placeholderTextColor="#9AA1AC"
+            style={styles.formInput}
+            keyboardType="phone-pad"
+          />
+
+          <Pressable
+            style={[styles.publishButton, savingAd && styles.publishButtonDisabled]}
+            onPress={submitAd}
+            disabled={savingAd}
+          >
+            {savingAd ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.publishButtonText}>Опубликовать объявление</Text>
+            )}
+          </Pressable>
+          <Text style={styles.formFootnote}>Поля со звёздочкой обязательны. Не указывайте пароли и коды из SMS.</Text>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.placeholderContent}>
+          <Ionicons
+            name={tab === "Избранное" ? "heart-outline" : tab === "Сообщения" ? "chatbubble-ellipses-outline" : "person-outline"}
+            size={42}
+            color="#F36B32"
+          />
+          <Text style={styles.formTitle}>{tab}</Text>
+          <Text style={styles.formHint}>Этот раздел пока в разработке. Сначала подключим публикацию объявлений.</Text>
+          <Pressable style={styles.publishButton} onPress={() => setTab("Добавить")}>
+            <Text style={styles.publishButtonText}>Разместить объявление</Text>
+          </Pressable>
+        </ScrollView>
+      )}
 
       <View style={styles.bottomBar}>
         {(
@@ -370,6 +531,22 @@ const styles = StyleSheet.create({
   },
   cityText: { fontSize: 12, fontWeight: "700", color: "#20242B" },
   content: { paddingHorizontal: 18, paddingBottom: 24 },
+  formContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 32 },
+  placeholderContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+  formTitle: { color: "#20242B", fontSize: 23, fontWeight: "900", marginBottom: 6 },
+  formHint: { color: "#8B929D", fontSize: 13, lineHeight: 19, marginBottom: 20 },
+  fieldLabel: { color: "#20242B", fontSize: 13, fontWeight: "800", marginTop: 14, marginBottom: 8 },
+  formInput: { minHeight: 48, borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#20242B", fontSize: 14, backgroundColor: "#FFFFFF" },
+  descriptionInput: { minHeight: 110 },
+  choiceWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  choiceChip: { borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: "#FFFFFF" },
+  choiceChipActive: { borderColor: "#F36B32", backgroundColor: "#FFF0E9" },
+  choiceText: { color: "#555D68", fontSize: 11, fontWeight: "600" },
+  choiceTextActive: { color: "#D95722" },
+  publishButton: { minHeight: 50, borderRadius: 13, backgroundColor: "#F36B32", alignItems: "center", justifyContent: "center", paddingHorizontal: 16, marginTop: 24 },
+  publishButtonDisabled: { opacity: 0.65 },
+  publishButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  formFootnote: { color: "#9AA1AC", fontSize: 10, lineHeight: 15, textAlign: "center", marginTop: 12 },
   searchBox: {
     height: 50,
     backgroundColor: "#F4F5F7",
