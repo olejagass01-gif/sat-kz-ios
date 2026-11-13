@@ -364,7 +364,10 @@ export default function App() {
     setReportReason((current) => current === null ? "" : null);
   };
 
-  const showAdDetails = (item: Listing) => setSelectedListing(item);
+  const showAdDetails = (item: Listing) => {
+    setReportReason(null);
+    setSelectedListing(item);
+  };
 
   const openChat = async (item: Listing) => {
     if (!session?.user?.id) {
@@ -1346,9 +1349,9 @@ export default function App() {
 
       <Modal visible={!!selectedListing} transparent animationType="slide" onRequestClose={() => setSelectedListing(null)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.detailsSheet}>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: "88%" }} keyboardShouldPersistTaps="handled">
-              <Pressable style={styles.modalClose} onPress={() => setSelectedListing(null)}>
+          <View style={[styles.detailsSheet, { height: "90%", maxHeight: "90%" }]}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 18 }} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="always" nestedScrollEnabled>
+              <Pressable style={styles.modalClose} onPress={() => { setReportReason(null); setSelectedListing(null); }}>
                 <Ionicons name="close" size={25} color="#20242B" />
               </Pressable>
               {selectedListing?.imageUrls?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>{selectedListing.imageUrls.map((uri) => <Image key={uri} source={{ uri }} style={styles.detailsPhoto} />)}</ScrollView> : null}
