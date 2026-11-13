@@ -104,9 +104,17 @@ export default function App() {
   const [adCategory, setAdCategory] = useState("Недвижимость");
   const [adPhone, setAdPhone] = useState("");
   const [savingAd, setSavingAd] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
 
   useEffect(() => {
     loadListings();
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   const loadListings = async () => {
@@ -141,6 +149,43 @@ export default function App() {
 
     setListings(formatted);
     setLoading(false);
+  };
+
+  const signInWithGoogle = async () => {
+    setAuthBusy(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: "https://sat-kz.vercel.app/" },
+    });
+    if (error) {
+      setAuthBusy(false);
+      Alert.alert("Ошибка входа", error.message);
+    }
+  };
+
+  const signInWithEmail = async () => {
+    const email = authEmail.trim();
+    if (!email || !email.includes("@")) {
+      Alert.alert("Проверьте почту", "Введите корректный адрес электронной почты.");
+      return;
+    }
+    setAuthBusy(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: "https://sat-kz.vercel.app/" },
+    });
+    setAuthBusy(false);
+    if (error) {
+      Alert.alert("Не удалось отправить письмо", error.message);
+      return;
+    }
+    Alert.alert("Письмо отправлено", "Откройте письмо от SAT KZ и перейдите по ссылке для входа.");
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) Alert.alert("Ошибка", error.message);
+    else Alert.alert("Вы вышли", "Вы вышли из аккаунта SAT KZ.");
   };
 
   const submitAd = async () => {
@@ -452,15 +497,61 @@ export default function App() {
           </Pressable>
           <Text style={styles.formFootnote}>Поля со звёздочкой обязательны. Не указывайте пароли и коды из SMS.</Text>
         </ScrollView>
+      ) : tab === "Профиль" ? (
+        <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.formTitle}>Мой профиль</Text>
+          {session?.user ? (
+            <>
+              <View style={styles.profileCard}>
+                <Ionicons name="person-circle-outline" size={48} color="#F36B32" />
+                <Text style={styles.profileEmail}>{session.user.email || session.user.phone || "Пользователь SAT KZ"}</Text>
+                <Text style={styles.formHint}>Вы вошли в свой аккаунт.</Text>
+              </View>
+              <Pressable style={styles.publishButton} onPress={signOut}>
+                <Text style={styles.publishButtonText}>Выйти из аккаунта</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.formHint}>Войдите, чтобы пользоваться возможностями SAT KZ.</Text>
+              <Pressable
+                style={[styles.publishButton, authBusy && styles.publishButtonDisabled]}
+                onPress={signInWithGoogle}
+                disabled={authBusy}
+              >
+                {authBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Продолжить с Google</Text>}
+              </Pressable>
+              <Text style={styles.fieldLabel}>Или войдите по электронной почте</Text>
+              <TextInput
+                value={authEmail}
+                onChangeText={setAuthEmail}
+                placeholder="example@gmail.com"
+                placeholderTextColor="#9AA1AC"
+                style={styles.formInput}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable
+                style={[styles.publishButton, authBusy && styles.publishButtonDisabled]}
+                onPress={signInWithEmail}
+                disabled={authBusy}
+              >
+                <Text style={styles.publishButtonText}>Получить ссылку для входа</Text>
+              </Pressable>
+              <Text style={styles.formFootnote}>Мы отправим ссылку на почту. Пароль вводить не нужно.</Text>
+            </>
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.placeholderContent}>
           <Ionicons
-            name={tab === "Избранное" ? "heart-outline" : tab === "Сообщения" ? "chatbubble-ellipses-outline" : "person-outline"}
+            name={tab === "Избранное" ? "heart-outline" : "chatbubble-ellipses-outline"}
             size={42}
             color="#F36B32"
           />
           <Text style={styles.formTitle}>{tab}</Text>
-          <Text style={styles.formHint}>Этот раздел пока в разработке. Сначала подключим публикацию объявлений.</Text>
+          <Text style={styles.formHint}>Этот раздел пока в разработке.</Text>
           <Pressable style={styles.publishButton} onPress={() => setTab("Добавить")}>
             <Text style={styles.publishButtonText}>Разместить объявление</Text>
           </Pressable>
@@ -534,6 +625,8 @@ const styles = StyleSheet.create({
   formContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 32 },
   placeholderContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 28 },
   formTitle: { color: "#20242B", fontSize: 23, fontWeight: "900", marginBottom: 6 },
+  profileCard: { alignItems: "center", backgroundColor: "#F7F8FA", borderRadius: 16, padding: 22, marginTop: 16 },
+  profileEmail: { color: "#20242B", fontSize: 15, fontWeight: "800", marginTop: 10, marginBottom: 6, textAlign: "center" },
   formHint: { color: "#8B929D", fontSize: 13, lineHeight: 19, marginBottom: 20 },
   fieldLabel: { color: "#20242B", fontSize: 13, fontWeight: "800", marginTop: 14, marginBottom: 8 },
   formInput: { minHeight: 48, borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#20242B", fontSize: 14, backgroundColor: "#FFFFFF" },
