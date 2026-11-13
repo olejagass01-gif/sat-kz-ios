@@ -285,7 +285,7 @@ export default function App() {
       conversationId = created.id;
     }
     setSelectedListing(null);
-    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId });
+    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId, otherUserId: sellerId });
     setChatDraft("");
     await loadChatMessages(conversationId);
     setChatLoading(false);
@@ -388,6 +388,7 @@ export default function App() {
       adId: Number(conversation.ad_id),
       adTitle: conversation.adTitle,
       sellerId: conversation.seller_id,
+      otherUserId: conversation.otherUserId || (conversation.buyer_id === session?.user?.id ? conversation.seller_id : conversation.buyer_id),
     });
     setChatLoading(true);
     await loadChatMessages(conversation.id);
@@ -996,6 +997,9 @@ export default function App() {
                 </Pressable>
               </View>
               <Text style={styles.formTitle}>{activeConversation.adTitle}</Text>
+              <Text style={{ color: "#42658A", fontSize: 13, fontWeight: "700", marginTop: 5, marginBottom: 4 }}>
+                Собеседник: {getUnknownSenderName(activeConversation.otherUserId || activeConversation.sellerId || "unknown")}
+              </Text>
               {chatLoading ? <ActivityIndicator color="#F36B32" /> : (
                 <View style={{ gap: 9, marginTop: 12, marginBottom: 18 }}>
                   {chatMessages.length === 0 ? <Text style={styles.formHint}>Начните переписку — напишите первое сообщение.</Text> : chatMessages.map((message) => (
