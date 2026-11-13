@@ -13,7 +13,9 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
 import "react-native-url-polyfill/auto";
@@ -33,6 +35,7 @@ type Listing = {
   time: string;
   description: string;
   phone: string;
+  imageUrls: string[];
 };
 
 const categories = [
@@ -114,6 +117,9 @@ export default function App() {
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [editingAdId, setEditingAdId] = useState<number | null>(null);
 
   useEffect(() => {
     loadListings();
@@ -129,7 +135,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from("ads")
-      .select("id, title, description, phone, price, city, category, created_at")
+      .select("id, title, description, phone, price, city, category, image_url, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -154,6 +160,7 @@ export default function App() {
       time: formatTime(item.created_at),
       description: item.description || "",
       phone: item.phone || "",
+      imageUrls: (() => { try { const v = JSON.parse(item.image_url || "[]"); return Array.isArray(v) ? v : item.image_url ? [item.image_url] : []; } catch { return item.image_url ? [item.image_url] : []; } })(),
     }));
 
     setListings(formatted);
@@ -198,7 +205,7 @@ export default function App() {
     setMyAdsLoading(true);
     const { data, error } = await supabase
       .from("ads")
-      .select("id, title, price, city, category, created_at")
+      .select("id, title, description, phone, price, city, category, image_url, created_at")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
     setMyAdsLoading(false);
@@ -216,7 +223,54 @@ export default function App() {
       time: formatTime(item.created_at),
       description: item.description || "",
       phone: item.phone || "",
+      imageUrls: (() => { try { const v = JSON.parse(item.image_url || "[]"); return Array.isArray(v) ? v : item.image_url ? [item.image_url] : []; } catch { return item.image_url ? [item.image_url] : []; } })(),
     })));
+  };
+
+  const pickAdImages = async () => {
+    const remaining = 10 - existingImages.length - adImages.length;
+    if (remaining <= 0) {
+      Alert.alert("Лимит фотографий", "Можно добавить не больше 10 фотографий.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.8,
+    });
+    if (!result.canceled) setAdImages((current) => [...current, ...result.assets].slice(0, remaining));
+  };
+
+  const beginEditAd = (item: Listing) => {
+    setEditingAdId(item.id);
+    setAdTitle(item.title);
+    setAdDescription(item.description);
+    setAdPrice(item.price.replace(/[^0-9,]/g, "").replace(",", "."));
+    setAdCity(item.city);
+    setAdCategory(item.category || "Недвижимость");
+    setAdPhone(item.phone);
+    setExistingImages(item.imageUrls || []);
+    setAdImages([]);
+    setTab("Добавить");
+  };
+
+  const uploadAdImages = async () => {
+    const uploaded: string[] = [];
+    for (const asset of adImages) {
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const ext = (asset.fileName?.split(".").pop() || "jpg").toLowerCase();
+      const path = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("ad-images").upload(path, blob, {
+        contentType: asset.mimeType || "image/jpeg",
+        upsert: false,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("ad-images").getPublicUrl(path);
+      uploaded.push(data.publicUrl);
+    }
+    return [...existingImages, ...uploaded].slice(0, 10);
   };
 
   const deleteMyAd = async (id: number) => {
@@ -263,7 +317,15 @@ export default function App() {
     }
 
     setSavingAd(true);
-    const { error } = await supabase.from("ads").insert({
+    let imageUrls: string[] = [];
+    try {
+      imageUrls = await uploadAdImages();
+    } catch (uploadError: any) {
+      setSavingAd(false);
+      Alert.alert("Ошибка загрузки фото", uploadError?.message || "Не удалось загрузить фотографии.");
+      return;
+    }
+    const adPayload = {
       user_id: session.user.id,
       title: cleanTitle,
       description: adDescription.trim(),
@@ -271,7 +333,11 @@ export default function App() {
       city: adCity,
       category: adCategory,
       phone: cleanPhone,
-    });
+      image_url: JSON.stringify(imageUrls),
+    };
+    const { error } = editingAdId
+      ? await supabase.from("ads").update(adPayload).eq("id", editingAdId).eq("user_id", session.user.id)
+      : await supabase.from("ads").insert(adPayload);
 
     setSavingAd(false);
     if (error) {
@@ -288,6 +354,9 @@ export default function App() {
     setAdDescription("");
     setAdPrice("");
     setAdPhone("");
+    setAdImages([]);
+    setExistingImages([]);
+    setEditingAdId(null);
     await loadListings();
     setTab("Главная");
     Alert.alert("Готово", "Объявление опубликовано.");
@@ -469,9 +538,18 @@ export default function App() {
           contentContainerStyle={styles.formContent}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.formTitle}>Новое объявление</Text>
+          <Text style={styles.formTitle}>{editingAdId ? "Редактировать объявление" : "Новое объявление"}</Text>
           <Text style={styles.formHint}>Расскажите покупателям, что вы продаёте</Text>
 
+          <Text style={styles.fieldLabel}>Фотографии (до 10)</Text>
+          <Pressable style={styles.photoPicker} onPress={pickAdImages}>
+            <Ionicons name="images-outline" size={22} color="#F36B32" />
+            <Text style={styles.photoPickerText}>Добавить фотографии ({existingImages.length + adImages.length}/10)</Text>
+          </Pressable>
+          <View style={styles.photoRow}>
+            {existingImages.map((uri) => <Image key={uri} source={{ uri }} style={styles.photoThumb} />)}
+            {adImages.map((asset, index) => <Image key={asset.uri + index} source={{ uri: asset.uri }} style={styles.photoThumb} />)}
+          </View>
           <Text style={styles.fieldLabel}>Название *</Text>
           <TextInput
             value={adTitle}
@@ -552,7 +630,7 @@ export default function App() {
             {savingAd ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.publishButtonText}>Опубликовать объявление</Text>
+              <Text style={styles.publishButtonText}>{editingAdId ? "Сохранить изменения" : "Опубликовать объявление"}</Text>
             )}
           </Pressable>
           <Text style={styles.formFootnote}>Поля со звёздочкой обязательны. Не указывайте пароли и коды из SMS.</Text>
@@ -575,14 +653,14 @@ export default function App() {
                 <Text style={styles.formHint}>У вас пока нет опубликованных объявлений. Нажмите «Обновить мои объявления».</Text>
               ) : myAds.map((item) => (
                 <View key={item.id} style={[styles.listingCard, { marginBottom: 10 }]}>
-                  <View style={styles.listingImage}><Text style={styles.listingEmoji}>{item.emoji}</Text></View>
+                  <Pressable onPress={() => showAdDetails(item)} style={styles.listingImage}>{item.imageUrls?.[0] ? <Image source={{ uri: item.imageUrls[0] }} style={styles.listingPhoto} /> : <Text style={styles.listingEmoji}>{item.emoji}</Text>}</Pressable>
                   <View style={styles.listingInfo}>
                     <Text style={styles.listingPrice}>{item.price}</Text>
                     <Text style={styles.listingTitle}>{item.title}</Text>
                     <Text style={styles.listingMeta}>{item.city} · {item.time}</Text>
-                    <Pressable onPress={() => deleteMyAd(item.id)} style={{ marginTop: 10 }}>
-                      <Text style={{ color: "#D93025", fontSize: 12, fontWeight: "800" }}>Удалить объявление</Text>
-                    </Pressable>
+                    <Pressable onPress={() => showAdDetails(item)} style={{ marginTop: 8 }}><Text style={{ color: "#F36B32", fontSize: 12, fontWeight: "800" }}>Посмотреть</Text></Pressable>
+                    <Pressable onPress={() => beginEditAd(item)} style={{ marginTop: 8 }}><Text style={{ color: "#246BCE", fontSize: 12, fontWeight: "800" }}>Редактировать</Text></Pressable>
+                    <Pressable onPress={() => deleteMyAd(item.id)} style={{ marginTop: 8 }}><Text style={{ color: "#D93025", fontSize: 12, fontWeight: "800" }}>Удалить объявление</Text></Pressable>
                   </View>
                 </View>
               ))}
@@ -643,6 +721,7 @@ export default function App() {
             <Pressable style={styles.modalClose} onPress={() => setSelectedListing(null)}>
               <Ionicons name="close" size={25} color="#20242B" />
             </Pressable>
+            {selectedListing?.imageUrls?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>{selectedListing.imageUrls.map((uri) => <Image key={uri} source={{ uri }} style={styles.detailsPhoto} />)}</ScrollView> : null}
             <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
             <Text style={styles.detailsPrice}>{selectedListing?.price}</Text>
             <Text style={styles.detailsMeta}>{selectedListing?.city} · {selectedListing?.time}</Text>
@@ -831,6 +910,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   listingEmoji: { fontSize: 35 },
+  listingPhoto: { width: "100%", height: "100%", borderRadius: 12 },
+  detailsPhoto: { width: 260, height: 210, borderRadius: 14, marginRight: 10 },
+  photoPicker: { minHeight: 52, borderWidth: 1, borderStyle: "dashed", borderColor: "#F36B32", borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, marginBottom: 10 },
+  photoPickerText: { color: "#F36B32", fontSize: 13, fontWeight: "800" },
+  photoRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoThumb: { width: 66, height: 66, borderRadius: 9 },
   listingInfo: { flex: 1 },
   listingPrice: {
     color: "#20242B",
