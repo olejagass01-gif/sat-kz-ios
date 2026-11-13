@@ -120,6 +120,8 @@ export default function App() {
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
+  const [deleteAdId, setDeleteAdId] = useState<number | null>(null);
+  const [deletingAd, setDeletingAd] = useState(false);
 
   useEffect(() => {
     loadListings();
@@ -273,20 +275,19 @@ export default function App() {
     return [...existingImages, ...uploaded].slice(0, 10);
   };
 
-  const deleteMyAd = async (id: number) => {
-    Alert.alert("Удалить объявление?", "Это действие нельзя отменить.", [
-      { text: "Отмена", style: "cancel" },
-      { text: "Удалить", style: "destructive", onPress: async () => {
-        const { error } = await supabase.from("ads").delete().eq("id", id).eq("user_id", session.user.id);
-        if (error) {
-          Alert.alert("Не удалось удалить", error.message);
-          return;
-        }
-        setMyAds((current) => current.filter((item) => item.id !== id));
-        await loadListings();
-        Alert.alert("Готово", "Объявление удалено.");
-      }},
-    ]);
+  const deleteMyAd = async () => {
+    if (deleteAdId === null || !session?.user?.id) return;
+    setDeletingAd(true);
+    const { error } = await supabase.from("ads").delete().eq("id", deleteAdId).eq("user_id", session.user.id);
+    setDeletingAd(false);
+    if (error) {
+      setDeleteAdId(null);
+      Alert.alert("Не удалось удалить", error.message);
+      return;
+    }
+    setMyAds((current) => current.filter((item) => item.id !== deleteAdId));
+    setListings((current) => current.filter((item) => item.id !== deleteAdId));
+    setDeleteAdId(null);
   };
 
   const signOut = async () => {
@@ -538,6 +539,10 @@ export default function App() {
           contentContainerStyle={styles.formContent}
           keyboardShouldPersistTaps="handled"
         >
+          <Pressable onPress={() => { setTab(editingAdId ? "Профиль" : "Главная"); setEditingAdId(null); setAdImages([]); setExistingImages([]); }} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={19} color="#20242B" />
+            <Text style={styles.backButtonText}>Назад</Text>
+          </Pressable>
           <Text style={styles.formTitle}>{editingAdId ? "Редактировать объявление" : "Новое объявление"}</Text>
           <Text style={styles.formHint}>Расскажите покупателям, что вы продаёте</Text>
 
@@ -660,7 +665,7 @@ export default function App() {
                     <Text style={styles.listingMeta}>{item.city} · {item.time}</Text>
                     <Pressable onPress={() => showAdDetails(item)} style={{ marginTop: 8 }}><Text style={{ color: "#F36B32", fontSize: 12, fontWeight: "800" }}>Посмотреть</Text></Pressable>
                     <Pressable onPress={() => beginEditAd(item)} style={{ marginTop: 8 }}><Text style={{ color: "#246BCE", fontSize: 12, fontWeight: "800" }}>Редактировать</Text></Pressable>
-                    <Pressable onPress={() => deleteMyAd(item.id)} style={{ marginTop: 8 }}><Text style={{ color: "#D93025", fontSize: 12, fontWeight: "800" }}>Удалить объявление</Text></Pressable>
+                    <Pressable onPress={() => setDeleteAdId(item.id)} style={{ marginTop: 8 }}><Text style={{ color: "#D93025", fontSize: 12, fontWeight: "800" }}>Удалить объявление</Text></Pressable>
                   </View>
                 </View>
               ))}
@@ -714,6 +719,23 @@ export default function App() {
           </Pressable>
         </ScrollView>
       )}
+
+      <Modal visible={deleteAdId !== null} transparent animationType="fade" onRequestClose={() => setDeleteAdId(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.confirmSheet}>
+            <Text style={styles.detailsTitle}>Удалить объявление?</Text>
+            <Text style={styles.formHint}>Это действие нельзя отменить.</Text>
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.cancelButton} onPress={() => setDeleteAdId(null)} disabled={deletingAd}>
+                <Text style={styles.cancelButtonText}>Отмена</Text>
+              </Pressable>
+              <Pressable style={styles.deleteButton} onPress={deleteMyAd} disabled={deletingAd}>
+                {deletingAd ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Удалить</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={!!selectedListing} transparent animationType="slide" onRequestClose={() => setSelectedListing(null)}>
         <View style={styles.modalBackdrop}>
@@ -801,6 +823,13 @@ const styles = StyleSheet.create({
   cityText: { fontSize: 12, fontWeight: "700", color: "#20242B" },
   content: { paddingHorizontal: 18, paddingBottom: 24 },
   formContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 32 },
+  backButton: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 7, paddingVertical: 8, paddingHorizontal: 4, marginBottom: 10 },
+  backButtonText: { color: "#20242B", fontSize: 14, fontWeight: "700" },
+  confirmSheet: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 22, margin: 24 },
+  confirmActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  cancelButton: { flex: 1, minHeight: 48, borderRadius: 12, backgroundColor: "#F1F2F4", alignItems: "center", justifyContent: "center" },
+  cancelButtonText: { color: "#20242B", fontSize: 14, fontWeight: "800" },
+  deleteButton: { flex: 1, minHeight: 48, borderRadius: 12, backgroundColor: "#D93025", alignItems: "center", justifyContent: "center" },
   placeholderContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 28 },
   formTitle: { color: "#20242B", fontSize: 23, fontWeight: "900", marginBottom: 6 },
   profileCard: { alignItems: "center", backgroundColor: "#F7F8FA", borderRadius: 16, padding: 22, marginTop: 16 },
