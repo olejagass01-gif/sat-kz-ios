@@ -107,6 +107,8 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [myAds, setMyAds] = useState<Listing[]>([]);
+  const [myAdsLoading, setMyAdsLoading] = useState(false);
 
   useEffect(() => {
     loadListings();
@@ -180,6 +182,46 @@ export default function App() {
       return;
     }
     Alert.alert("Письмо отправлено", "Откройте письмо от SAT KZ и перейдите по ссылке для входа.");
+  };
+
+  const loadMyAds = async () => {
+    if (!session?.user?.id) return;
+    setMyAdsLoading(true);
+    const { data, error } = await supabase
+      .from("ads")
+      .select("id, title, price, city, category, created_at")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+    setMyAdsLoading(false);
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось загрузить ваши объявления.");
+      return;
+    }
+    setMyAds((data || []).map((item) => ({
+      id: Number(item.id),
+      title: item.title || "Без названия",
+      price: item.price !== null ? Number(item.price).toLocaleString("ru-RU") + " ₸" : "Цена не указана",
+      city: item.city || "Казахстан",
+      category: item.category || "",
+      emoji: getEmoji(item.category || ""),
+      time: formatTime(item.created_at),
+    })));
+  };
+
+  const deleteMyAd = async (id: number) => {
+    Alert.alert("Удалить объявление?", "Это действие нельзя отменить.", [
+      { text: "Отмена", style: "cancel" },
+      { text: "Удалить", style: "destructive", onPress: async () => {
+        const { error } = await supabase.from("ads").delete().eq("id", id).eq("user_id", session.user.id);
+        if (error) {
+          Alert.alert("Не удалось удалить", error.message);
+          return;
+        }
+        setMyAds((current) => current.filter((item) => item.id !== id));
+        await loadListings();
+        Alert.alert("Готово", "Объявление удалено.");
+      }},
+    ]);
   };
 
   const signOut = async () => {
@@ -514,7 +556,26 @@ export default function App() {
                 <Text style={styles.profileEmail}>{session.user.email || session.user.phone || "Пользователь SAT KZ"}</Text>
                 <Text style={styles.formHint}>Вы вошли в свой аккаунт.</Text>
               </View>
-              <Pressable style={styles.publishButton} onPress={signOut}>
+              <Pressable style={styles.publishButton} onPress={loadMyAds}>
+                <Text style={styles.publishButtonText}>Обновить мои объявления</Text>
+              </Pressable>
+              <Text style={[styles.fieldLabel, { marginTop: 24 }]}>Мои объявления</Text>
+              {myAdsLoading ? <ActivityIndicator color="#F36B32" /> : myAds.length === 0 ? (
+                <Text style={styles.formHint}>У вас пока нет опубликованных объявлений. Нажмите «Обновить мои объявления».</Text>
+              ) : myAds.map((item) => (
+                <View key={item.id} style={[styles.listingCard, { marginBottom: 10 }]}>
+                  <View style={styles.listingImage}><Text style={styles.listingEmoji}>{item.emoji}</Text></View>
+                  <View style={styles.listingInfo}>
+                    <Text style={styles.listingPrice}>{item.price}</Text>
+                    <Text style={styles.listingTitle}>{item.title}</Text>
+                    <Text style={styles.listingMeta}>{item.city} · {item.time}</Text>
+                    <Pressable onPress={() => deleteMyAd(item.id)} style={{ marginTop: 10 }}>
+                      <Text style={{ color: "#D93025", fontSize: 12, fontWeight: "800" }}>Удалить объявление</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+              <Pressable style={[styles.publishButton, { backgroundColor: "#68707C" }]} onPress={signOut}>
                 <Text style={styles.publishButtonText}>Выйти из аккаунта</Text>
               </Pressable>
             </>
