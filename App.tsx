@@ -123,6 +123,8 @@ export default function App() {
   const [savingAd, setSavingAd] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [authEmail, setAuthEmail] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
@@ -144,9 +146,13 @@ export default function App() {
 
   useEffect(() => {
     loadListings();
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setProfileName(data.session?.user?.user_metadata?.display_name || data.session?.user?.user_metadata?.full_name || "");
+    });
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      setProfileName(nextSession?.user?.user_metadata?.display_name || nextSession?.user?.user_metadata?.full_name || "");
     });
     return () => authListener.subscription.unsubscribe();
   }, []);
@@ -570,6 +576,23 @@ export default function App() {
     else Alert.alert("Вы вышли", "Вы вышли из аккаунта SAT KZ.");
   };
 
+  const saveProfileName = async () => {
+    const cleanName = profileName.trim();
+    if (!cleanName) {
+      Alert.alert("Укажите имя", "Введите имя для профиля.");
+      return;
+    }
+    setProfileSaving(true);
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: cleanName } });
+    setProfileSaving(false);
+    if (error) {
+      Alert.alert("Не удалось сохранить", error.message);
+      return;
+    }
+    setSession((current: any) => current ? { ...current, user: data.user } : current);
+    Alert.alert("Готово", "Имя профиля сохранено.");
+  };
+
   const submitAd = async () => {
     if (!session?.user?.id) {
       Alert.alert("Нужен вход", "Войдите в аккаунт через раздел «Профиль», чтобы опубликовать объявление.");
@@ -911,9 +934,15 @@ export default function App() {
           {session?.user ? (
             <>
               <View style={styles.profileCard}>
-                <Ionicons name="person-circle-outline" size={48} color="#F36B32" />
-                <Text style={styles.profileEmail}>{session.user.email || session.user.phone || "Пользователь SAT KZ"}</Text>
-                <Text style={styles.formHint}>Вы вошли в свой аккаунт.</Text>
+                <Ionicons name="person-circle-outline" size={56} color="#F36B32" />
+                <Text style={styles.profileEmail}>{profileName || "Пользователь SAT KZ"}</Text>
+                <Text style={{ color: "#8B929D", fontSize: 12, marginBottom: 12 }}>{session.user.email || session.user.phone || ""}</Text>
+                <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left", marginTop: 4 }]}>Имя профиля</Text>
+                <TextInput value={profileName} onChangeText={setProfileName} placeholder="Как вас называть?" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch", backgroundColor: "#FFFFFF" }]} maxLength={40} />
+                <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={saveProfileName} disabled={profileSaving}>
+                  {profileSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить имя</Text>}
+                </Pressable>
+                <Text style={[styles.formHint, { marginTop: 12, marginBottom: 0 }]}>Имя будет отображаться в вашем профиле SAT KZ.</Text>
               </View>
               <Pressable style={styles.publishButton} onPress={loadMyAds}>
                 <Text style={styles.publishButtonText}>Обновить мои объявления</Text>
