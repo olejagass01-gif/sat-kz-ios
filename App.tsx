@@ -1404,7 +1404,7 @@ export default function App() {
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
                   {[1, 2, 3, 4, 5].map((star) => <Pressable key={star} onPress={() => setReviewRating(star)}><Text style={{ fontSize: 30, color: star <= reviewRating ? "#F5A623" : "#D9DDE3" }}>★</Text></Pressable>)}
                 </View>
-                <TextInput value={reviewComment} onChangeText={setReviewComment} placeholder="Напишите отзыв о продавце..." multiline style={{ minHeight: 76, borderWidth: 1, borderColor: "#E3E6EA", borderRadius: 12, padding: 12, textAlignVertical: "top", color: "#20242B", marginBottom: 10 }} />
+                <TextInput value={reviewComment} onChangeText={setReviewComment} placeholder="Напишите отзыв о продавце..." multiline style={{ minHeight: 76, borderWidth: 1, borderColor: "#E3E6EA", borderRadius: 12, padding: 12, textAlignVertical: "top", color: "#20242B", fontSize: 16, marginBottom: 10 }} />
                 <Pressable style={styles.publishButton} onPress={saveSellerReview} disabled={reviewSaving}>
                   {reviewSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить отзыв</Text>}
                 </Pressable>
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
   profileEmail: { color: "#20242B", fontSize: 15, fontWeight: "800", marginTop: 10, marginBottom: 6, textAlign: "center" },
   formHint: { color: "#8B929D", fontSize: 13, lineHeight: 19, marginBottom: 20 },
   fieldLabel: { color: "#20242B", fontSize: 13, fontWeight: "800", marginTop: 14, marginBottom: 8 },
-  formInput: { minHeight: 48, borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#20242B", fontSize: 14, backgroundColor: "#FFFFFF" },
+  formInput: { minHeight: 48, borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#20242B", fontSize: 16, backgroundColor: "#FFFFFF" },
   descriptionInput: { minHeight: 110 },
   choiceWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   choiceChip: { borderWidth: 1, borderColor: "#E5E8EC", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: "#FFFFFF" },
@@ -1529,7 +1529,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 18,
   },
-  searchInput: { flex: 1, fontSize: 14, color: "#20242B" },
+  searchInput: { flex: 1, fontSize: 16, color: "#20242B" },
   banner: {
     backgroundColor: "#20242B",
     borderRadius: 20,
