@@ -140,6 +140,7 @@ export default function App() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reportSaving, setReportSaving] = useState(false);
+  const [reportReason, setReportReason] = useState<string | null>(null);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
@@ -354,19 +355,13 @@ export default function App() {
       }
       return;
     }
+    setReportReason(null);
     Alert.alert("Жалоба отправлена", "Спасибо! Мы проверим это объявление.");
   };
 
   const showReportOptions = () => {
     if (!selectedListing || reportSaving) return;
-    Alert.alert("Пожаловаться на объявление", "Выберите причину жалобы:", [
-      { text: "Мошенничество", onPress: () => reportListing("Мошенничество") },
-      { text: "Неверная информация", onPress: () => reportListing("Неверная информация") },
-      { text: "Запрещённый товар", onPress: () => reportListing("Запрещённый товар") },
-      { text: "Спам или дубликат", onPress: () => reportListing("Спам или дубликат") },
-      { text: "Другая причина", onPress: () => reportListing("Другая причина") },
-      { text: "Отмена", style: "cancel" },
-    ]);
+    setReportReason((current) => current === null ? "" : null);
   };
 
   const showAdDetails = (item: Listing) => setSelectedListing(item);
@@ -1379,6 +1374,19 @@ export default function App() {
                 <Pressable onPress={showReportOptions} disabled={reportSaving} style={{ alignSelf: "flex-start", paddingVertical: 9, marginBottom: 4 }}>
                   <Text style={{ color: "#D94F1B", fontSize: 13, fontWeight: "700" }}>{reportSaving ? "Отправка жалобы..." : "⚑ Пожаловаться на объявление"}</Text>
                 </Pressable>
+              ) : null}
+              {reportReason !== null ? (
+                <View style={{ backgroundColor: "#F7F8FA", borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                  <Text style={{ color: "#20242B", fontWeight: "800", marginBottom: 8 }}>Выберите причину жалобы</Text>
+                  {["Мошенничество", "Неверная информация", "Запрещённый товар", "Спам или дубликат", "Другая причина"].map((reason) => (
+                    <Pressable key={reason} onPress={() => setReportReason(reason)} style={{ paddingVertical: 10, paddingHorizontal: 8, borderRadius: 8, backgroundColor: reportReason === reason ? "#FCE5DA" : "#FFFFFF", marginBottom: 5, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA" }}>
+                      <Text style={{ color: "#20242B", fontWeight: reportReason === reason ? "800" : "500" }}>{reportReason === reason ? "● " : "○ "}{reason}</Text>
+                    </Pressable>
+                  ))}
+                  <Pressable onPress={() => reportListing(reportReason)} disabled={!reportReason || reportSaving} style={[styles.publishButton, { marginTop: 6, opacity: !reportReason || reportSaving ? 0.5 : 1 }]}>
+                    {reportSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Отправить жалобу</Text>}
+                  </Pressable>
+                </View>
               ) : null}
               <Text style={styles.detailsLabel}>Отзывы покупателей</Text>
               {sellerReviews.map((review) => (
