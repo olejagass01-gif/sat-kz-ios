@@ -126,6 +126,12 @@ export default function App() {
   const [deletingAd, setDeletingAd] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [activeConversation, setActiveConversation] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   useEffect(() => {
     loadListings();
@@ -210,6 +216,130 @@ export default function App() {
   };
 
   const showAdDetails = (item: Listing) => setSelectedListing(item);
+
+  const openChat = async (item: Listing) => {
+    if (!session?.user?.id) {
+      setSelectedListing(null);
+      setTab("Профиль");
+      Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы написать продавцу.");
+      return;
+    }
+    if (item.userId === session.user.id) return;
+    setChatLoading(true);
+    let conversationId: string | null = null;
+    const { data: existing, error: findError } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("ad_id", item.id)
+      .eq("buyer_id", session.user.id)
+      .eq("seller_id", item.userId)
+      .maybeSingle();
+    if (findError) {
+      setChatLoading(false);
+      Alert.alert("Ошибка", "Не удалось открыть переписку.");
+      return;
+    }
+    if (existing?.id) {
+      conversationId = existing.id;
+    } else {
+      const { data: created, error: createError } = await supabase
+        .from("conversations")
+        .insert({ ad_id: item.id, buyer_id: session.user.id, seller_id: item.userId })
+        .select("id")
+        .single();
+      if (createError || !created?.id) {
+        setChatLoading(false);
+        Alert.alert("Ошибка", "Не удалось создать переписку. Попробуйте ещё раз.");
+        return;
+      }
+      conversationId = created.id;
+    }
+    setSelectedListing(null);
+    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId: item.userId });
+    setChatDraft("");
+    await loadChatMessages(conversationId);
+    setChatLoading(false);
+    setTab("Сообщения");
+  };
+
+  const loadChatMessages = async (conversationId: string) => {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("id, sender_id, body, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось загрузить сообщения.");
+      return;
+    }
+    setChatMessages(data || []);
+  };
+
+  const loadConversations = async () => {
+    if (!session?.user?.id) {
+      setConversations([]);
+      return;
+    }
+    setChatLoading(true);
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id, ad_id, buyer_id, seller_id, created_at")
+      .order("created_at", { ascending: false });
+    if (error) {
+      setChatLoading(false);
+      Alert.alert("Ошибка", "Не удалось загрузить переписки.");
+      return;
+    }
+    const rows = data || [];
+    const adIds = [...new Set(rows.map((row: any) => Number(row.ad_id)))];
+    let adsById: Record<number, any> = {};
+    if (adIds.length) {
+      const { data: ads } = await supabase.from("ads").select("id, title, image_url").in("id", adIds);
+      (ads || []).forEach((ad: any) => { adsById[Number(ad.id)] = ad; });
+    }
+    setConversations(rows.map((row: any) => ({
+      ...row,
+      adTitle: adsById[Number(row.ad_id)]?.title || "Объявление удалено",
+      adImage: adsById[Number(row.ad_id)]?.image_url || "",
+      otherUserId: row.buyer_id === session.user.id ? row.seller_id : row.buyer_id,
+    })));
+    setChatLoading(false);
+  };
+
+  const openConversation = async (conversation: any) => {
+    setActiveConversation({
+      id: conversation.id,
+      adId: Number(conversation.ad_id),
+      adTitle: conversation.adTitle,
+      sellerId: conversation.seller_id,
+    });
+    setChatLoading(true);
+    await loadChatMessages(conversation.id);
+    setChatLoading(false);
+  };
+
+  const sendChatMessage = async () => {
+    const body = chatDraft.trim();
+    if (!body || !activeConversation || !session?.user?.id || sendingMessage) return;
+    setSendingMessage(true);
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ conversation_id: activeConversation.id, sender_id: session.user.id, body })
+      .select("id, sender_id, body, created_at")
+      .single();
+    setSendingMessage(false);
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось отправить сообщение.");
+      return;
+    }
+    setChatMessages((current) => [...current, data]);
+    setChatDraft("");
+    loadConversations();
+  };
+
+  useEffect(() => {
+    if (tab === "Сообщения" && session?.user?.id) loadConversations();
+  }, [tab, session?.user?.id]);
 
   const signInWithGoogle = async () => {
     setAuthBusy(true);
@@ -768,13 +898,58 @@ export default function App() {
           ))}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.placeholderContent}>
-          <Ionicons name="chatbubble-ellipses-outline" size={42} color="#F36B32" />
-          <Text style={styles.formTitle}>Сообщения</Text>
-          <Text style={styles.formHint}>Этот раздел пока в разработке.</Text>
-          <Pressable style={styles.publishButton} onPress={() => setTab("Добавить")}>
-            <Text style={styles.publishButtonText}>Разместить объявление</Text>
-          </Pressable>
+        <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+          {activeConversation ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <Pressable onPress={() => { setActiveConversation(null); loadConversations(); }}>
+                  <Text style={styles.seeAll}>‹ Все переписки</Text>
+                </Pressable>
+                <Pressable onPress={() => loadChatMessages(activeConversation.id)}>
+                  <Text style={styles.seeAll}>Обновить</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.formTitle}>{activeConversation.adTitle}</Text>
+              {chatLoading ? <ActivityIndicator color="#F36B32" /> : (
+                <View style={{ gap: 9, marginTop: 12, marginBottom: 18 }}>
+                  {chatMessages.length === 0 ? <Text style={styles.formHint}>Начните переписку — напишите первое сообщение.</Text> : chatMessages.map((message) => (
+                    <View key={message.id} style={{ alignSelf: message.sender_id === session?.user?.id ? "flex-end" : "flex-start", maxWidth: "85%", backgroundColor: message.sender_id === session?.user?.id ? "#FFF0E9" : "#F2F3F5", borderRadius: 14, padding: 12 }}>
+                      <Text style={{ color: "#20242B", fontSize: 14 }}>{message.body}</Text>
+                      <Text style={{ color: "#9299A3", fontSize: 10, marginTop: 5 }}>{new Date(message.created_at).toLocaleString("ru-RU")}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <TextInput value={chatDraft} onChangeText={setChatDraft} placeholder="Напишите сообщение..." placeholderTextColor="#9AA1AC" style={styles.formInput} multiline />
+              <Pressable style={[styles.publishButton, (!chatDraft.trim() || sendingMessage) && styles.publishButtonDisabled]} onPress={sendChatMessage} disabled={!chatDraft.trim() || sendingMessage}>
+                {sendingMessage ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Отправить</Text>}
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.formTitle}>Сообщения</Text>
+                <Pressable onPress={loadConversations}><Text style={styles.seeAll}>Обновить</Text></Pressable>
+              </View>
+              {!session?.user?.id ? <Text style={styles.formHint}>Войдите в аккаунт, чтобы пользоваться сообщениями.</Text> : chatLoading ? <ActivityIndicator size="large" color="#F36B32" /> : conversations.length === 0 ? (
+                <View style={styles.placeholderContent}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={42} color="#F36B32" />
+                  <Text style={styles.formHint}>Пока нет переписок. Откройте любое объявление и нажмите «Написать продавцу».</Text>
+                </View>
+              ) : conversations.map((conversation) => (
+                <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={[styles.listingCard, { marginBottom: 10 }]}>
+                  <View style={[styles.listingImage, { overflow: "hidden" }]}>
+                    {conversation.adImage ? <Image source={{ uri: (() => { try { const v = JSON.parse(conversation.adImage); return Array.isArray(v) ? v[0] : conversation.adImage; } catch { return conversation.adImage; } })() }} style={styles.listingPhoto} /> : <Ionicons name="chatbubble-outline" size={28} color="#F36B32" />}
+                  </View>
+                  <View style={styles.listingInfo}>
+                    <Text style={styles.listingTitle}>{conversation.adTitle}</Text>
+                    <Text style={styles.listingMeta}>Нажмите, чтобы открыть переписку</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9299A3" />
+                </Pressable>
+              ))}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -830,7 +1005,10 @@ export default function App() {
             <Text style={styles.detailsDescription}>{selectedListing?.description || "Описание не указано"}</Text>
             <Text style={styles.detailsLabel}>Телефон продавца</Text>
             <Text style={styles.detailsDescription}>{selectedListing?.phone || "Не указан"}</Text>
-            {selectedListing?.phone ? <Pressable style={styles.publishButton} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
+            {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? <Pressable style={styles.publishButton} onPress={() => openChat(selectedListing)}>
+              <Text style={styles.publishButtonText}>Написать продавцу</Text>
+            </Pressable> : null}
+            {selectedListing?.phone ? <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
               <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
             </Pressable> : null}
           </View>
