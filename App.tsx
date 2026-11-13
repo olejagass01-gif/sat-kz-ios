@@ -152,7 +152,7 @@ export default function App() {
       return;
     }
 
-    const numericPrice = Number(adPrice.replace(/\\s/g, "").replace(",", "."));
+    const numericPrice = Number(adPrice.replace(/\s/g, "").replace(",", "."));
     if (!Number.isFinite(numericPrice) || numericPrice < 0) {
       Alert.alert("Неверная цена", "Введите цену числом, например 15000.");
       return;
