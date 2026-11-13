@@ -104,6 +104,7 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState("Все");
   const [tab, setTab] = useState("Главная");
   const [selectedCity, setSelectedCity] = useState("Все города");
+  const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [adTitle, setAdTitle] = useState("");
   const [adDescription, setAdDescription] = useState("");
   const [adPrice, setAdPrice] = useState("");
@@ -363,17 +364,7 @@ export default function App() {
     Alert.alert("Готово", "Объявление опубликовано.");
   };
 
-  const chooseCity = () =>
-    Alert.alert(
-      "Выберите город",
-      "Показывать объявления из выбранного города",
-      cities
-        .map((city) => ({
-          text: city === selectedCity ? "✓ " + city : city,
-          onPress: () => setSelectedCity(city),
-        }))
-        .concat([{ text: "Отмена", style: "cancel" as const }])
-    );
+  const chooseCity = () => setCityPickerVisible(true);
 
   const filtered = useMemo(
     () =>
@@ -720,6 +711,27 @@ export default function App() {
         </ScrollView>
       )}
 
+      <Modal visible={cityPickerVisible} transparent animationType="fade" onRequestClose={() => setCityPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.citySheet}>
+            <View style={styles.citySheetHeader}>
+              <Text style={styles.detailsTitle}>Выберите город</Text>
+              <Pressable onPress={() => setCityPickerVisible(false)} style={styles.modalClose}>
+                <Ionicons name="close" size={24} color="#20242B" />
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {cities.map((city) => (
+                <Pressable key={city} style={styles.cityOption} onPress={() => { setSelectedCity(city); setCityPickerVisible(false); }}>
+                  <Text style={[styles.cityOptionText, selectedCity === city && styles.cityOptionTextActive]}>{city}</Text>
+                  {selectedCity === city ? <Ionicons name="checkmark-circle" size={21} color="#F36B32" /> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={deleteAdId !== null} transparent animationType="fade" onRequestClose={() => setDeleteAdId(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.confirmSheet}>
@@ -825,6 +837,11 @@ const styles = StyleSheet.create({
   formContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 32 },
   backButton: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 7, paddingVertical: 8, paddingHorizontal: 4, marginBottom: 10 },
   backButtonText: { color: "#20242B", fontSize: 14, fontWeight: "700" },
+  citySheet: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 20, margin: 24, maxHeight: "75%" },
+  citySheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cityOption: { minHeight: 48, borderBottomWidth: 1, borderBottomColor: "#EEF0F2", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4 },
+  cityOptionText: { color: "#343A43", fontSize: 14, fontWeight: "600" },
+  cityOptionTextActive: { color: "#F36B32", fontWeight: "800" },
   confirmSheet: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 22, margin: 24 },
   confirmActions: { flexDirection: "row", gap: 10, marginTop: 8 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 12, backgroundColor: "#F1F2F4", alignItems: "center", justifyContent: "center" },
