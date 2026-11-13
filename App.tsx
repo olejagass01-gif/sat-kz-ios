@@ -23,7 +23,10 @@ type Listing = {
   emoji: string;
   time: string;
 };
-
+const supabase = createClient(
+  "https://sgpbkamcfviwysfoayui.supabase.co",
+  "sb_publishable_iA-uqsk7PoEuZY0Z2quAAA_WiTmOjS4"
+);
 const categories = [
   { name: "Недвижимость", icon: "home-outline" as const },
   { name: "Транспорт", icon: "car-outline" as const },
