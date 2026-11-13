@@ -139,6 +139,7 @@ export default function App() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [reportSaving, setReportSaving] = useState(false);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
@@ -330,6 +331,42 @@ export default function App() {
     setSellerReviews((current) => current.filter((review) => review.reviewer_id !== session.user.id));
     setReviewRating(5);
     setReviewComment("");
+  };
+
+  const reportListing = async (reason: string) => {
+    if (!selectedListing) return;
+    if (!session?.user?.id) {
+      Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы пожаловаться на объявление.");
+      return;
+    }
+    setReportSaving(true);
+    const { error } = await supabase.from("ad_reports").insert({
+      ad_id: selectedListing.id,
+      reporter_id: session.user.id,
+      reason,
+    });
+    setReportSaving(false);
+    if (error) {
+      if (error.code === "23505") {
+        Alert.alert("Уже отправлено", "Вы уже жаловались на это объявление.");
+      } else {
+        Alert.alert("Ошибка", "Не удалось отправить жалобу. Попробуйте позже.");
+      }
+      return;
+    }
+    Alert.alert("Жалоба отправлена", "Спасибо! Мы проверим это объявление.");
+  };
+
+  const showReportOptions = () => {
+    if (!selectedListing || reportSaving) return;
+    Alert.alert("Пожаловаться на объявление", "Выберите причину жалобы:", [
+      { text: "Мошенничество", onPress: () => reportListing("Мошенничество") },
+      { text: "Неверная информация", onPress: () => reportListing("Неверная информация") },
+      { text: "Запрещённый товар", onPress: () => reportListing("Запрещённый товар") },
+      { text: "Спам или дубликат", onPress: () => reportListing("Спам или дубликат") },
+      { text: "Другая причина", onPress: () => reportListing("Другая причина") },
+      { text: "Отмена", style: "cancel" },
+    ]);
   };
 
   const showAdDetails = (item: Listing) => setSelectedListing(item);
@@ -1338,6 +1375,11 @@ export default function App() {
               <Text style={{ color: "#F36B32", fontWeight: "900", fontSize: 16, marginBottom: 8 }}>
                 {sellerReviews.length ? "★ " + (sellerReviews.reduce((sum, review) => sum + review.rating, 0) / sellerReviews.length).toFixed(1) + " · " + sellerReviews.length + " отзыв(ов)" : "Пока нет отзывов"}
               </Text>
+              {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? (
+                <Pressable onPress={showReportOptions} disabled={reportSaving} style={{ alignSelf: "flex-start", paddingVertical: 9, marginBottom: 4 }}>
+                  <Text style={{ color: "#D94F1B", fontSize: 13, fontWeight: "700" }}>{reportSaving ? "Отправка жалобы..." : "⚑ Пожаловаться на объявление"}</Text>
+                </Pressable>
+              ) : null}
               <Text style={styles.detailsLabel}>Отзывы покупателей</Text>
               {sellerReviews.map((review) => (
                 <View key={review.id} style={{ paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#F0F1F3" }}>
