@@ -27,6 +27,7 @@ const supabase = createClient(
 
 type Listing = {
   id: number;
+  userId: string;
   title: string;
   price: string;
   city: string;
@@ -140,7 +141,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from("ads")
-      .select("id, title, description, phone, price, city, category, image_url, created_at")
+      .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -154,6 +155,7 @@ export default function App() {
 
     const formatted: Listing[] = (data || []).map((item) => ({
       id: Number(item.id),
+      userId: item.user_id || "",
       title: item.title || "Без названия",
       price:
         item.price !== null
@@ -547,7 +549,8 @@ export default function App() {
                 </View>
 
                 <Pressable
-                  style={styles.favorite}
+                  style={[styles.favorite, item.userId === session?.user?.id && { opacity: 0.25 }]}
+                  disabled={item.userId === session?.user?.id}
                   onPress={() => toggleFavorite(item)}
                 >
                   <Ionicons
