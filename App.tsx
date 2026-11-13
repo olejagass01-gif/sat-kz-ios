@@ -189,6 +189,12 @@ export default function App() {
   };
 
   const submitAd = async () => {
+    if (!session?.user?.id) {
+      Alert.alert("Нужен вход", "Войдите в аккаунт через раздел «Профиль», чтобы опубликовать объявление.");
+      setTab("Профиль");
+      return;
+    }
+
     const cleanTitle = adTitle.trim();
     const cleanPhone = adPhone.trim();
 
@@ -205,6 +211,7 @@ export default function App() {
 
     setSavingAd(true);
     const { error } = await supabase.from("ads").insert({
+      user_id: session.user.id,
       title: cleanTitle,
       description: adDescription.trim(),
       price: numericPrice,
