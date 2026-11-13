@@ -224,15 +224,36 @@ export default function App() {
       Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы написать продавцу.");
       return;
     }
-    if (item.userId === session.user.id) return;
+    const isKnownOwnAd = item.userId === session.user.id || myAds.some((ad) => ad.id === item.id);
+    if (isKnownOwnAd) {
+      Alert.alert("Это ваше объявление", "Нельзя начать переписку с самим собой.");
+      return;
+    }
     setChatLoading(true);
+    const { data: ownerAd, error: ownerError } = await supabase
+      .from("ads")
+      .select("user_id")
+      .eq("id", item.id)
+      .limit(1)
+      .maybeSingle();
+    if (ownerError || !ownerAd?.user_id) {
+      setChatLoading(false);
+      Alert.alert("Ошибка", "Не удалось проверить владельца объявления.");
+      return;
+    }
+    if (ownerAd.user_id === session.user.id) {
+      setChatLoading(false);
+      Alert.alert("Это ваше объявление", "Нельзя начать переписку с самим собой.");
+      return;
+    }
+    const sellerId = ownerAd.user_id;
     let conversationId: string | null = null;
     const { data: existing, error: findError } = await supabase
       .from("conversations")
       .select("id")
       .eq("ad_id", item.id)
       .eq("buyer_id", session.user.id)
-      .eq("seller_id", item.userId)
+      .eq("seller_id", sellerId)
       .maybeSingle();
     if (findError) {
       setChatLoading(false);
@@ -244,7 +265,7 @@ export default function App() {
     } else {
       const { data: created, error: createError } = await supabase
         .from("conversations")
-        .insert({ ad_id: item.id, buyer_id: session.user.id, seller_id: item.userId })
+        .insert({ ad_id: item.id, buyer_id: session.user.id, seller_id: sellerId })
         .select("id")
         .single();
       if (createError || !created?.id) {
@@ -255,7 +276,7 @@ export default function App() {
       conversationId = created.id;
     }
     setSelectedListing(null);
-    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId: item.userId });
+    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId });
     setChatDraft("");
     await loadChatMessages(conversationId);
     setChatLoading(false);
@@ -377,7 +398,7 @@ export default function App() {
     setMyAdsLoading(true);
     const { data, error } = await supabase
       .from("ads")
-      .select("id, title, description, phone, price, city, category, image_url, created_at")
+      .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
     setMyAdsLoading(false);
@@ -387,6 +408,7 @@ export default function App() {
     }
     setMyAds((data || []).map((item) => ({
       id: Number(item.id),
+      userId: item.user_id || "",
       title: item.title || "Без названия",
       price: item.price !== null ? Number(item.price).toLocaleString("ru-RU") + " ₸" : "Цена не указана",
       city: item.city || "Казахстан",
