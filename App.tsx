@@ -134,6 +134,11 @@ export default function App() {
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [sellerReviews, setSellerReviews] = useState<any[]>([]);
+  const [sellerProfile, setSellerProfile] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
@@ -247,6 +252,84 @@ export default function App() {
       if (error) { Alert.alert("Ошибка", "Не удалось добавить в избранное."); return; }
       setFavoriteIds((current) => [...current, item.id]);
     }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const loadSellerReviews = async () => {
+      if (!selectedListing?.userId) {
+        setSellerReviews([]);
+        setSellerProfile(null);
+        return;
+      }
+      const [profileResult, reviewsResult] = await Promise.all([
+        supabase.from("profiles").select("display_name, avatar_url, city").eq("id", selectedListing.userId).maybeSingle(),
+        supabase.from("seller_reviews").select("id, reviewer_id, rating, comment, created_at").eq("seller_id", selectedListing.userId).order("created_at", { ascending: false }),
+      ]);
+      if (!active) return;
+      setSellerProfile(profileResult.data || null);
+      const reviews = reviewsResult.data || [];
+      const reviewerIds = [...new Set(reviews.map((review: any) => review.reviewer_id))];
+      let names: Record<string, string> = {};
+      if (reviewerIds.length) {
+        const { data: people } = await supabase.from("profiles").select("id, display_name").in("id", reviewerIds);
+        (people || []).forEach((person: any) => { names[person.id] = person.display_name || "Пользователь SAT KZ"; });
+      }
+      if (!active) return;
+      setSellerReviews(reviews.map((review: any) => ({ ...review, reviewerName: names[review.reviewer_id] || "Пользователь SAT KZ" })));
+      const ownReview = reviews.find((review: any) => review.reviewer_id === session?.user?.id);
+      setReviewRating(ownReview?.rating || 5);
+      setReviewComment(ownReview?.comment || "");
+    };
+    loadSellerReviews();
+    return () => { active = false; };
+  }, [selectedListing?.userId, session?.user?.id]);
+
+  const saveSellerReview = async () => {
+    const comment = reviewComment.trim();
+    if (!session?.user?.id) {
+      Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы оставить отзыв.");
+      return;
+    }
+    if (!selectedListing?.userId || selectedListing.userId === session.user.id) return;
+    if (comment.length < 2) {
+      Alert.alert("Отзыв слишком короткий", "Напишите хотя бы 2 символа.");
+      return;
+    }
+    setReviewSaving(true);
+    const { error } = await supabase.from("seller_reviews").upsert({
+      seller_id: selectedListing.userId,
+      reviewer_id: session.user.id,
+      rating: reviewRating,
+      comment,
+    }, { onConflict: "seller_id,reviewer_id" });
+    setReviewSaving(false);
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось сохранить отзыв.");
+      return;
+    }
+    const { data } = await supabase.from("seller_reviews").select("id, reviewer_id, rating, comment, created_at").eq("seller_id", selectedListing.userId).order("created_at", { ascending: false });
+    const rows = data || [];
+    const ids = [...new Set(rows.map((review: any) => review.reviewer_id))];
+    let names: Record<string, string> = {};
+    if (ids.length) {
+      const { data: people } = await supabase.from("profiles").select("id, display_name").in("id", ids);
+      (people || []).forEach((person: any) => { names[person.id] = person.display_name || "Пользователь SAT KZ"; });
+    }
+    setSellerReviews(rows.map((review: any) => ({ ...review, reviewerName: names[review.reviewer_id] || "Пользователь SAT KZ" })));
+    Alert.alert("Готово", "Ваш отзыв сохранён.");
+  };
+
+  const deleteSellerReview = async () => {
+    if (!session?.user?.id || !selectedListing?.userId) return;
+    const { error } = await supabase.from("seller_reviews").delete().eq("seller_id", selectedListing.userId).eq("reviewer_id", session.user.id);
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось удалить отзыв.");
+      return;
+    }
+    setSellerReviews((current) => current.filter((review) => review.reviewer_id !== session.user.id));
+    setReviewRating(5);
+    setReviewComment("");
   };
 
   const showAdDetails = (item: Listing) => setSelectedListing(item);
@@ -1232,23 +1315,54 @@ export default function App() {
       <Modal visible={!!selectedListing} transparent animationType="slide" onRequestClose={() => setSelectedListing(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.detailsSheet}>
-            <Pressable style={styles.modalClose} onPress={() => setSelectedListing(null)}>
-              <Ionicons name="close" size={25} color="#20242B" />
-            </Pressable>
-            {selectedListing?.imageUrls?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>{selectedListing.imageUrls.map((uri) => <Image key={uri} source={{ uri }} style={styles.detailsPhoto} />)}</ScrollView> : null}
-            <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
-            <Text style={styles.detailsPrice}>{selectedListing?.price}</Text>
-            <Text style={styles.detailsMeta}>{selectedListing?.city} · {selectedListing?.time}</Text>
-            <Text style={styles.detailsLabel}>Описание</Text>
-            <Text style={styles.detailsDescription}>{selectedListing?.description || "Описание не указано"}</Text>
-            <Text style={styles.detailsLabel}>Телефон продавца</Text>
-            <Text style={styles.detailsDescription}>{selectedListing?.phone || "Не указан"}</Text>
-            {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? <Pressable style={styles.publishButton} onPress={() => openChat(selectedListing)}>
-              <Text style={styles.publishButtonText}>Написать продавцу</Text>
-            </Pressable> : null}
-            {selectedListing?.phone ? <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
-              <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
-            </Pressable> : null}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: "88%" }} keyboardShouldPersistTaps="handled">
+              <Pressable style={styles.modalClose} onPress={() => setSelectedListing(null)}>
+                <Ionicons name="close" size={25} color="#20242B" />
+              </Pressable>
+              {selectedListing?.imageUrls?.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>{selectedListing.imageUrls.map((uri) => <Image key={uri} source={{ uri }} style={styles.detailsPhoto} />)}</ScrollView> : null}
+              <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
+              <Text style={styles.detailsPrice}>{selectedListing?.price}</Text>
+              <Text style={styles.detailsMeta}>{selectedListing?.city} · {selectedListing?.time}</Text>
+              <Text style={styles.detailsLabel}>Описание</Text>
+              <Text style={styles.detailsDescription}>{selectedListing?.description || "Описание не указано"}</Text>
+              <Text style={styles.detailsLabel}>Телефон продавца</Text>
+              <Text style={styles.detailsDescription}>{selectedListing?.phone || "Не указан"}</Text>
+              <Text style={styles.detailsLabel}>Продавец</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                {sellerProfile?.avatar_url ? <Image source={{ uri: sellerProfile.avatar_url }} style={{ width: 42, height: 42, borderRadius: 21, marginRight: 10 }} /> : <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: "#F1F2F4", alignItems: "center", justifyContent: "center", marginRight: 10 }}><Ionicons name="person" size={21} color="#9299A3" /></View>}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#20242B", fontWeight: "800", fontSize: 15 }}>{sellerProfile?.display_name || "Пользователь SAT KZ"}</Text>
+                  <Text style={{ color: "#9299A3", fontSize: 12 }}>{sellerProfile?.city || selectedListing?.city || ""}</Text>
+                </View>
+              </View>
+              <Text style={{ color: "#F36B32", fontWeight: "900", fontSize: 16, marginBottom: 8 }}>
+                {sellerReviews.length ? "★ " + (sellerReviews.reduce((sum, review) => sum + review.rating, 0) / sellerReviews.length).toFixed(1) + " · " + sellerReviews.length + " отзыв(ов)" : "Пока нет отзывов"}
+              </Text>
+              <Text style={styles.detailsLabel}>Отзывы покупателей</Text>
+              {sellerReviews.map((review) => (
+                <View key={review.id} style={{ paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#F0F1F3" }}>
+                  <Text style={{ color: "#20242B", fontWeight: "800", fontSize: 13 }}>{review.reviewerName} · <Text style={{ color: "#F36B32" }}>{"★".repeat(review.rating)}</Text></Text>
+                  <Text style={styles.detailsDescription}>{review.comment}</Text>
+                  {review.reviewer_id === session?.user?.id ? <Pressable onPress={deleteSellerReview} style={{ alignSelf: "flex-start", paddingVertical: 6 }}><Text style={{ color: "#D94F1B", fontSize: 12, fontWeight: "700" }}>Удалить мой отзыв</Text></Pressable> : null}
+                </View>
+              ))}
+              {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? <>
+                <Text style={styles.detailsLabel}>{sellerReviews.some((review) => review.reviewer_id === session?.user?.id) ? "Изменить свой отзыв" : "Оставить отзыв"}</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                  {[1, 2, 3, 4, 5].map((star) => <Pressable key={star} onPress={() => setReviewRating(star)}><Text style={{ fontSize: 30, color: star <= reviewRating ? "#F5A623" : "#D9DDE3" }}>★</Text></Pressable>)}
+                </View>
+                <TextInput value={reviewComment} onChangeText={setReviewComment} placeholder="Напишите отзыв о продавце..." multiline style={{ minHeight: 76, borderWidth: 1, borderColor: "#E3E6EA", borderRadius: 12, padding: 12, textAlignVertical: "top", color: "#20242B", marginBottom: 10 }} />
+                <Pressable style={styles.publishButton} onPress={saveSellerReview} disabled={reviewSaving}>
+                  {reviewSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить отзыв</Text>}
+                </Pressable>
+              </> : null}
+              {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? <Pressable style={styles.publishButton} onPress={() => openChat(selectedListing)}>
+                <Text style={styles.publishButtonText}>Написать продавцу</Text>
+              </Pressable> : null}
+              {selectedListing?.phone ? <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
+                <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
+              </Pressable> : null}
+            </ScrollView>
           </View>
         </View>
       </Modal>
