@@ -504,7 +504,7 @@ export default function App() {
                 onPress={() => showAdDetails(item)}
               >
                 <View style={styles.listingImage}>
-                  <Text style={styles.listingEmoji}>{item.emoji}</Text>
+                  {item.imageUrls?.[0] ? <Image source={{ uri: item.imageUrls[0] }} style={styles.listingPhoto} /> : <Text style={styles.listingEmoji}>{item.emoji}</Text>}
                 </View>
 
                 <View style={styles.listingInfo}>
