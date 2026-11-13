@@ -125,6 +125,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
@@ -628,6 +629,7 @@ export default function App() {
       return;
     }
     setSession((current: any) => current ? { ...current, user: data.user } : current);
+    setProfileEditing(false);
     Alert.alert("Готово", "Имя профиля сохранено и будет отображаться в переписках.");
   };
 
@@ -975,12 +977,29 @@ export default function App() {
                 <Ionicons name="person-circle-outline" size={56} color="#F36B32" />
                 <Text style={styles.profileEmail}>{profileName || "Пользователь SAT KZ"}</Text>
                 <Text style={{ color: "#8B929D", fontSize: 12, marginBottom: 12 }}>{session.user.email || session.user.phone || ""}</Text>
-                <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left", marginTop: 4 }]}>Имя профиля</Text>
-                <TextInput value={profileName} onChangeText={setProfileName} placeholder="Как вас называть?" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch", backgroundColor: "#FFFFFF" }]} maxLength={40} />
-                <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={saveProfileName} disabled={profileSaving}>
-                  {profileSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить имя</Text>}
-                </Pressable>
-                <Text style={[styles.formHint, { marginTop: 12, marginBottom: 0 }]}>Имя будет отображаться в вашем профиле SAT KZ.</Text>
+                {profileName.trim() && !profileEditing ? (
+                  <>
+                    <Text style={{ color: "#8B929D", fontSize: 12, marginTop: 4 }}>Имя профиля</Text>
+                    <Text style={{ color: "#20242B", fontSize: 18, fontWeight: "800", marginTop: 5 }}>{profileName}</Text>
+                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={() => setProfileEditing(true)}>
+                      <Text style={styles.publishButtonText}>Изменить имя</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.fieldLabel, { alignSelf: "stretch", textAlign: "left", marginTop: 4 }]}>Имя профиля</Text>
+                    <TextInput value={profileName} onChangeText={setProfileName} placeholder="Как вас называть?" placeholderTextColor="#9AA1AC" style={[styles.formInput, { alignSelf: "stretch", backgroundColor: "#FFFFFF" }]} maxLength={40} />
+                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 12 }]} onPress={saveProfileName} disabled={profileSaving}>
+                      {profileSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Сохранить имя</Text>}
+                    </Pressable>
+                    {profileName.trim() ? (
+                      <Pressable onPress={() => setProfileEditing(false)} style={{ alignSelf: "center", padding: 10 }}>
+                        <Text style={{ color: "#68707C", fontSize: 12, fontWeight: "700" }}>Отмена</Text>
+                      </Pressable>
+                    ) : null}
+                    <Text style={[styles.formHint, { marginTop: 12, marginBottom: 0 }]}>Имя будет отображаться в вашем профиле SAT KZ.</Text>
+                  </>
+                )}
               </View>
               <Pressable style={styles.publishButton} onPress={loadMyAds}>
                 <Text style={styles.publishButtonText}>Обновить мои объявления</Text>
