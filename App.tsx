@@ -66,6 +66,14 @@ const cities = [
   "Туркестан",
 ];
 
+const getUnknownSenderName = (senderId: string) => {
+  let hash = 0;
+  for (let i = 0; i < senderId.length; i++) {
+    hash = (hash * 31 + senderId.charCodeAt(i)) >>> 0;
+  }
+  return `Неизвестный ${100 + (hash % 900)}`;
+};
+
 const getEmoji = (category: string) => {
   const emojis: Record<string, string> = {
     "Недвижимость": "🏠",
@@ -992,7 +1000,7 @@ export default function App() {
                 <View style={{ gap: 9, marginTop: 12, marginBottom: 18 }}>
                   {chatMessages.length === 0 ? <Text style={styles.formHint}>Начните переписку — напишите первое сообщение.</Text> : chatMessages.map((message) => (
                     <View key={message.id} style={{ alignSelf: message.sender_id === session?.user?.id ? "flex-end" : "flex-start", maxWidth: "85%", backgroundColor: message.sender_id === session?.user?.id ? "#FFF0E9" : "#F2F3F5", borderRadius: 14, padding: 12 }}>
-                      <Text style={{ color: message.sender_id === session?.user?.id ? "#F36B32" : "#42658A", fontSize: 11, fontWeight: "800", marginBottom: 5 }}>{message.sender_id === session?.user?.id ? "Вы отправили" : "Вам написал собеседник"}</Text>
+                      <Text style={{ color: message.sender_id === session?.user?.id ? "#F36B32" : "#42658A", fontSize: 11, fontWeight: "800", marginBottom: 5 }}>{message.sender_id === session?.user?.id ? "Вы отправили" : getUnknownSenderName(message.sender_id)}</Text>
                       <Text style={{ color: "#20242B", fontSize: 14 }}>{message.body}</Text>
                       <Text style={{ color: "#9299A3", fontSize: 10, marginTop: 5 }}>{new Date(message.created_at).toLocaleString("ru-RU")}</Text>
                     </View>
