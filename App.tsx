@@ -11,6 +11,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
@@ -29,6 +30,8 @@ type Listing = {
   category: string;
   emoji: string;
   time: string;
+  description: string;
+  phone: string;
 };
 
 const categories = [
@@ -124,7 +127,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from("ads")
-      .select("id, title, price, city, category, created_at")
+      .select("id, title, description, phone, price, city, category, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -147,10 +150,21 @@ export default function App() {
       category: item.category || "",
       emoji: getEmoji(item.category || ""),
       time: formatTime(item.created_at),
+      description: item.description || "",
+      phone: item.phone || "",
     }));
 
     setListings(formatted);
     setLoading(false);
+  };
+
+  const showAdDetails = (item: Listing) => {
+    const details = `${item.title}\n\n${item.description || "Описание не указано"}\n\nЦена: ${item.price}\nГород: ${item.city}\nТелефон: ${item.phone || "Не указан"}`;
+    const actions: any[] = [{ text: "Закрыть", style: "cancel" }];
+    if (item.phone) {
+      actions.unshift({ text: "Позвонить", onPress: () => Linking.openURL(`tel:${item.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона.")) });
+    }
+    Alert.alert("Объявление", details, actions);
   };
 
   const signInWithGoogle = async () => {
@@ -205,6 +219,8 @@ export default function App() {
       category: item.category || "",
       emoji: getEmoji(item.category || ""),
       time: formatTime(item.created_at),
+      description: item.description || "",
+      phone: item.phone || "",
     })));
   };
 
@@ -421,7 +437,7 @@ export default function App() {
               <Pressable
                 key={item.id}
                 style={styles.listingCard}
-                onPress={() => {}}
+                onPress={() => showAdDetails(item)}
               >
                 <View style={styles.listingImage}>
                   <Text style={styles.listingEmoji}>{item.emoji}</Text>
