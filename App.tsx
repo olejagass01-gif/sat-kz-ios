@@ -123,6 +123,8 @@ export default function App() {
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
   const [deleteAdId, setDeleteAdId] = useState<number | null>(null);
   const [deletingAd, setDeletingAd] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
 
   useEffect(() => {
     loadListings();
@@ -168,6 +170,41 @@ export default function App() {
 
     setListings(formatted);
     setLoading(false);
+  };
+
+  useEffect(() => {
+    if (session?.user?.id) loadFavorites();
+    else setFavoriteIds([]);
+  }, [session?.user?.id]);
+
+  const loadFavorites = async () => {
+    if (!session?.user?.id) return;
+    setFavoritesLoading(true);
+    const { data, error } = await supabase.from("favorites").select("ad_id").eq("user_id", session.user.id);
+    setFavoritesLoading(false);
+    if (error) {
+      Alert.alert("Ошибка", "Не удалось загрузить избранное.");
+      return;
+    }
+    setFavoriteIds((data || []).map((row: any) => Number(row.ad_id)));
+  };
+
+  const toggleFavorite = async (item: Listing) => {
+    if (!session?.user?.id) {
+      setTab("Профиль");
+      Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы сохранять объявления.");
+      return;
+    }
+    const isSaved = favoriteIds.includes(item.id);
+    if (isSaved) {
+      const { error } = await supabase.from("favorites").delete().eq("user_id", session.user.id).eq("ad_id", item.id);
+      if (error) { Alert.alert("Ошибка", "Не удалось убрать из избранного."); return; }
+      setFavoriteIds((current) => current.filter((id) => id !== item.id));
+    } else {
+      const { error } = await supabase.from("favorites").insert({ user_id: session.user.id, ad_id: item.id });
+      if (error) { Alert.alert("Ошибка", "Не удалось добавить в избранное."); return; }
+      setFavoriteIds((current) => [...current, item.id]);
+    }
   };
 
   const showAdDetails = (item: Listing) => setSelectedListing(item);
@@ -511,12 +548,12 @@ export default function App() {
 
                 <Pressable
                   style={styles.favorite}
-                  onPress={() => {}}
+                  onPress={() => toggleFavorite(item)}
                 >
                   <Ionicons
-                    name="heart-outline"
+                    name={favoriteIds.includes(item.id) ? "heart" : "heart-outline"}
                     size={21}
-                    color="#68707C"
+                    color={favoriteIds.includes(item.id) ? "#F36B32" : "#68707C"}
                   />
                 </Pressable>
               </Pressable>
@@ -696,14 +733,41 @@ export default function App() {
             </>
           )}
         </ScrollView>
+      ) : tab === "Избранное" ? (
+        <ScrollView contentContainerStyle={styles.formContent}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.formTitle}>Избранное</Text>
+            <Pressable onPress={loadFavorites}><Text style={styles.seeAll}>Обновить</Text></Pressable>
+          </View>
+          {!session?.user?.id ? (
+            <Text style={styles.formHint}>Войдите в аккаунт, чтобы сохранять объявления.</Text>
+          ) : favoritesLoading ? (
+            <ActivityIndicator size="large" color="#F36B32" />
+          ) : listings.filter((item) => favoriteIds.includes(item.id)).length === 0 ? (
+            <View style={styles.placeholderContent}>
+              <Ionicons name="heart-outline" size={42} color="#F36B32" />
+              <Text style={styles.formHint}>Здесь будут объявления, которые вы добавите в избранное.</Text>
+            </View>
+          ) : listings.filter((item) => favoriteIds.includes(item.id)).map((item) => (
+            <View key={item.id} style={[styles.listingCard, { marginBottom: 10 }]}>
+              <Pressable style={styles.listingImage} onPress={() => showAdDetails(item)}>
+                {item.imageUrls?.[0] ? <Image source={{ uri: item.imageUrls[0] }} style={styles.listingPhoto} /> : <Text style={styles.listingEmoji}>{item.emoji}</Text>}
+              </Pressable>
+              <Pressable style={styles.listingInfo} onPress={() => showAdDetails(item)}>
+                <Text style={styles.listingPrice}>{item.price}</Text>
+                <Text style={styles.listingTitle}>{item.title}</Text>
+                <Text style={styles.listingMeta}>{item.city} · {item.time}</Text>
+              </Pressable>
+              <Pressable style={styles.favorite} onPress={() => toggleFavorite(item)}>
+                <Ionicons name="heart" size={21} color="#F36B32" />
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.placeholderContent}>
-          <Ionicons
-            name={tab === "Избранное" ? "heart-outline" : "chatbubble-ellipses-outline"}
-            size={42}
-            color="#F36B32"
-          />
-          <Text style={styles.formTitle}>{tab}</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={42} color="#F36B32" />
+          <Text style={styles.formTitle}>Сообщения</Text>
           <Text style={styles.formHint}>Этот раздел пока в разработке.</Text>
           <Pressable style={styles.publishButton} onPress={() => setTab("Добавить")}>
             <Text style={styles.publishButtonText}>Разместить объявление</Text>
