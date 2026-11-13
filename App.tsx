@@ -373,11 +373,28 @@ export default function App() {
       const { data: ads } = await supabase.from("ads").select("id, title, image_url").in("id", adIds);
       (ads || []).forEach((ad: any) => { adsById[Number(ad.id)] = ad; });
     }
+    const unreadResult = rows.length ? await supabase
+      .from("messages")
+      .select("conversation_id, sender_id, created_at")
+      .in("conversation_id", rows.map((row: any) => row.id))
+      .neq("sender_id", session.user.id) : { data: [], error: null };
+    const unreadByChat: Record<string, boolean> = {};
+    (unreadResult.data || []).forEach((message: any) => {
+      const chat = rows.find((row: any) => row.id === message.conversation_id);
+      if (!chat) return;
+      const lastRead = chat.buyer_id === session.user.id
+        ? chat.buyer_last_read_at
+        : chat.seller_last_read_at;
+      if (!lastRead || new Date(message.created_at).getTime() > new Date(lastRead).getTime()) {
+        unreadByChat[message.conversation_id] = true;
+      }
+    });
     setConversations(rows.map((row: any) => ({
       ...row,
       adTitle: adsById[Number(row.ad_id)]?.title || "Объявление удалено",
       adImage: adsById[Number(row.ad_id)]?.image_url || "",
       otherUserId: row.buyer_id === session.user.id ? row.seller_id : row.buyer_id,
+      hasUnread: !!unreadByChat[row.id],
     })));
     setChatLoading(false);
   };
@@ -1028,13 +1045,13 @@ export default function App() {
                   <Text style={styles.formHint}>Пока нет переписок. Откройте любое объявление и нажмите «Написать продавцу».</Text>
                 </View>
               ) : conversations.map((conversation) => (
-                <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={[styles.listingCard, { marginBottom: 10 }]}>
+                <Pressable key={conversation.id} onPress={() => openConversation(conversation)} style={[styles.listingCard, { marginBottom: 10, backgroundColor: conversation.hasUnread ? "#FFF2E9" : "#FFFFFF", borderWidth: conversation.hasUnread ? 1.5 : 1, borderColor: conversation.hasUnread ? "#F36B32" : "#E8EAED" }]}>
                   <View style={[styles.listingImage, { overflow: "hidden" }]}>
                     {conversation.adImage ? <Image source={{ uri: (() => { try { const v = JSON.parse(conversation.adImage); return Array.isArray(v) ? v[0] : conversation.adImage; } catch { return conversation.adImage; } })() }} style={styles.listingPhoto} /> : <Ionicons name="chatbubble-outline" size={28} color="#F36B32" />}
                   </View>
                   <View style={styles.listingInfo}>
-                    <Text style={styles.listingTitle}>{conversation.adTitle}</Text>
-                    <Text style={styles.listingMeta}>Нажмите, чтобы открыть переписку</Text>
+                    <Text style={[styles.listingTitle, conversation.hasUnread && { fontWeight: "900", color: "#D94F1B" }]}>{conversation.adTitle}</Text>
+                    <Text style={[styles.listingMeta, conversation.hasUnread && { color: "#D94F1B", fontWeight: "800" }]}>{conversation.hasUnread ? "● Новое сообщение" : "Нажмите, чтобы открыть переписку"}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#9299A3" />
                 </Pressable>
