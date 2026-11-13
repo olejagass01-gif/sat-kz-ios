@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
@@ -112,6 +113,7 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
   useEffect(() => {
     loadListings();
@@ -158,14 +160,7 @@ export default function App() {
     setLoading(false);
   };
 
-  const showAdDetails = (item: Listing) => {
-    const details = `${item.title}\n\n${item.description || "Описание не указано"}\n\nЦена: ${item.price}\nГород: ${item.city}\nТелефон: ${item.phone || "Не указан"}`;
-    const actions: any[] = [{ text: "Закрыть", style: "cancel" }];
-    if (item.phone) {
-      actions.unshift({ text: "Позвонить", onPress: () => Linking.openURL(`tel:${item.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона.")) });
-    }
-    Alert.alert("Объявление", details, actions);
-  };
+  const showAdDetails = (item: Listing) => setSelectedListing(item);
 
   const signInWithGoogle = async () => {
     setAuthBusy(true);
@@ -642,6 +637,26 @@ export default function App() {
         </ScrollView>
       )}
 
+      <Modal visible={!!selectedListing} transparent animationType="slide" onRequestClose={() => setSelectedListing(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.detailsSheet}>
+            <Pressable style={styles.modalClose} onPress={() => setSelectedListing(null)}>
+              <Ionicons name="close" size={25} color="#20242B" />
+            </Pressable>
+            <Text style={styles.detailsTitle}>{selectedListing?.title}</Text>
+            <Text style={styles.detailsPrice}>{selectedListing?.price}</Text>
+            <Text style={styles.detailsMeta}>{selectedListing?.city} · {selectedListing?.time}</Text>
+            <Text style={styles.detailsLabel}>Описание</Text>
+            <Text style={styles.detailsDescription}>{selectedListing?.description || "Описание не указано"}</Text>
+            <Text style={styles.detailsLabel}>Телефон продавца</Text>
+            <Text style={styles.detailsDescription}>{selectedListing?.phone || "Не указан"}</Text>
+            {selectedListing?.phone ? <Pressable style={styles.publishButton} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
+              <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
+            </Pressable> : null}
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.bottomBar}>
         {(
           [
@@ -832,6 +847,14 @@ const styles = StyleSheet.create({
     padding: 24,
     fontSize: 13,
   },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  detailsSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, paddingBottom: 34, minHeight: 300 },
+  modalClose: { alignSelf: "flex-end", padding: 4, marginBottom: 8 },
+  detailsTitle: { color: "#20242B", fontSize: 22, fontWeight: "900", marginBottom: 10 },
+  detailsPrice: { color: "#F36B32", fontSize: 21, fontWeight: "900", marginBottom: 5 },
+  detailsMeta: { color: "#9299A3", fontSize: 12, marginBottom: 20 },
+  detailsLabel: { color: "#20242B", fontSize: 14, fontWeight: "800", marginBottom: 6, marginTop: 12 },
+  detailsDescription: { color: "#555D68", fontSize: 14, lineHeight: 21 },
   bottomBar: {
     height: 67,
     borderTopWidth: 1,
