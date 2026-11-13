@@ -140,6 +140,7 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [activeConversation, setActiveConversation] = useState<any>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatProfiles, setChatProfiles] = useState<Record<string, string>>({});
   const [chatDraft, setChatDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -156,6 +157,15 @@ export default function App() {
     });
     return () => authListener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    let active = true;
+    supabase.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle().then(({ data }) => {
+      if (active && data?.display_name) setProfileName(data.display_name);
+    });
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   const loadListings = async () => {
     setLoading(true);
@@ -291,7 +301,8 @@ export default function App() {
       conversationId = created.id;
     }
     setSelectedListing(null);
-    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId, otherUserId: sellerId });
+    const { data: sellerProfile } = await supabase.from("profiles").select("display_name").eq("id", sellerId).maybeSingle();
+    setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId, otherUserId: sellerId, otherUserName: sellerProfile?.display_name || "Пользователь SAT KZ" });
     setChatDraft("");
     await loadChatMessages(conversationId);
     setChatLoading(false);
@@ -308,7 +319,15 @@ export default function App() {
       Alert.alert("Ошибка", "Не удалось загрузить сообщения.");
       return;
     }
-    setChatMessages(data || []);
+    const messages = data || [];
+    const senderIds = [...new Set(messages.map((message: any) => message.sender_id).filter(Boolean))];
+    const { data: profiles } = senderIds.length
+      ? await supabase.from("profiles").select("id, display_name").in("id", senderIds)
+      : { data: [] };
+    const names: Record<string, string> = {};
+    (profiles || []).forEach((profile: any) => { names[profile.id] = profile.display_name; });
+    setChatProfiles(names);
+    setChatMessages(messages);
   };
 
   const loadUnreadCount = async () => {
@@ -379,6 +398,12 @@ export default function App() {
       const { data: ads } = await supabase.from("ads").select("id, title, image_url").in("id", adIds);
       (ads || []).forEach((ad: any) => { adsById[Number(ad.id)] = ad; });
     }
+    const otherIds = [...new Set(rows.map((row: any) => row.buyer_id === session.user.id ? row.seller_id : row.buyer_id).filter(Boolean))];
+    const { data: profileRows } = otherIds.length
+      ? await supabase.from("profiles").select("id, display_name").in("id", otherIds)
+      : { data: [] };
+    const profileById: Record<string, string> = {};
+    (profileRows || []).forEach((profile: any) => { profileById[profile.id] = profile.display_name; });
     const unreadResult = rows.length ? await supabase
       .from("messages")
       .select("conversation_id, sender_id, created_at")
@@ -400,6 +425,7 @@ export default function App() {
       adTitle: adsById[Number(row.ad_id)]?.title || "Объявление удалено",
       adImage: adsById[Number(row.ad_id)]?.image_url || "",
       otherUserId: row.buyer_id === session.user.id ? row.seller_id : row.buyer_id,
+      otherUserName: profileById[row.buyer_id === session.user.id ? row.seller_id : row.buyer_id] || "Пользователь SAT KZ",
       hasUnread: !!unreadByChat[row.id],
     })));
     setChatLoading(false);
@@ -412,6 +438,7 @@ export default function App() {
       adTitle: conversation.adTitle,
       sellerId: conversation.seller_id,
       otherUserId: conversation.otherUserId || (conversation.buyer_id === session?.user?.id ? conversation.seller_id : conversation.buyer_id),
+      otherUserName: conversation.otherUserName || "Пользователь SAT KZ",
     });
     setChatLoading(true);
     await loadChatMessages(conversation.id);
@@ -582,15 +609,26 @@ export default function App() {
       Alert.alert("Укажите имя", "Введите имя для профиля.");
       return;
     }
+    if (!session?.user?.id) return;
     setProfileSaving(true);
     const { data, error } = await supabase.auth.updateUser({ data: { display_name: cleanName } });
-    setProfileSaving(false);
     if (error) {
+      setProfileSaving(false);
       Alert.alert("Не удалось сохранить", error.message);
       return;
     }
+    const { error: profileError } = await supabase.from("profiles").upsert({
+      id: session.user.id,
+      display_name: cleanName,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "id" });
+    setProfileSaving(false);
+    if (profileError) {
+      Alert.alert("Не удалось сохранить имя для чатов", profileError.message);
+      return;
+    }
     setSession((current: any) => current ? { ...current, user: data.user } : current);
-    Alert.alert("Готово", "Имя профиля сохранено.");
+    Alert.alert("Готово", "Имя профиля сохранено и будет отображаться в переписках.");
   };
 
   const submitAd = async () => {
@@ -1044,13 +1082,13 @@ export default function App() {
               </View>
               <Text style={styles.formTitle}>{activeConversation.adTitle}</Text>
               <Text style={{ color: "#42658A", fontSize: 13, fontWeight: "700", marginTop: 5, marginBottom: 4 }}>
-                Собеседник: {getUnknownSenderName(activeConversation.otherUserId || activeConversation.sellerId || "unknown")}
+                Собеседник: {activeConversation.otherUserName || "Пользователь SAT KZ"}
               </Text>
               {chatLoading ? <ActivityIndicator color="#F36B32" /> : (
                 <View style={{ gap: 9, marginTop: 12, marginBottom: 18 }}>
                   {chatMessages.length === 0 ? <Text style={styles.formHint}>Начните переписку — напишите первое сообщение.</Text> : chatMessages.map((message) => (
                     <View key={message.id} style={{ alignSelf: message.sender_id === session?.user?.id ? "flex-end" : "flex-start", maxWidth: "85%", backgroundColor: message.sender_id === session?.user?.id ? "#FFF0E9" : "#F2F3F5", borderRadius: 14, padding: 12 }}>
-                      <Text style={{ color: message.sender_id === session?.user?.id ? "#F36B32" : "#42658A", fontSize: 11, fontWeight: "800", marginBottom: 5 }}>{message.sender_id === session?.user?.id ? "Вы отправили" : getUnknownSenderName(message.sender_id)}</Text>
+                      <Text style={{ color: message.sender_id === session?.user?.id ? "#F36B32" : "#42658A", fontSize: 11, fontWeight: "800", marginBottom: 5 }}>{message.sender_id === session?.user?.id ? "Вы отправили" : (chatProfiles[message.sender_id] || activeConversation.otherUserName || "Пользователь SAT KZ")}</Text>
                       <Text style={{ color: "#20242B", fontSize: 14 }}>{message.body}</Text>
                       <Text style={{ color: "#9299A3", fontSize: 10, marginTop: 5 }}>{new Date(message.created_at).toLocaleString("ru-RU")}</Text>
                     </View>
@@ -1080,7 +1118,7 @@ export default function App() {
                   </View>
                   <View style={styles.listingInfo}>
                     <Text style={[styles.listingTitle, conversation.hasUnread && { fontWeight: "900", color: "#D94F1B" }]}>{conversation.adTitle}</Text>
-                    <Text style={[styles.listingMeta, conversation.hasUnread && { color: "#D94F1B", fontWeight: "800" }]}>{conversation.hasUnread ? "● Новое сообщение" : "Нажмите, чтобы открыть переписку"}</Text>
+                    <Text style={[styles.listingMeta, conversation.hasUnread && { color: "#D94F1B", fontWeight: "800" }]}>{conversation.hasUnread ? "● Новое сообщение" : conversation.otherUserName}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#9299A3" />
                 </Pressable>
