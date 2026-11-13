@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import "react-native-url-polyfill/auto";
 import {
   SafeAreaView,
   View,
