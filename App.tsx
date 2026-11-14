@@ -143,7 +143,9 @@ export default function App() {
   const [reportReason, setReportReason] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<Listing | null>(null);
   const [adminReports, setAdminReports] = useState<any[]>([]);
+  const [adminBans, setAdminBans] = useState<any[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [banSaving, setBanSaving] = useState(false);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
@@ -191,10 +193,36 @@ export default function App() {
   const loadAdminReports = async () => {
     if (!isAdmin) return;
     setReportsLoading(true);
-    const { data, error } = await supabase.from("ad_reports").select("*").order("created_at", { ascending: false });
+    const [{ data, error }, { data: bans, error: bansError }] = await Promise.all([
+      supabase.from("ad_reports").select("*").order("created_at", { ascending: false }),
+      supabase.from("user_bans").select("*"),
+    ]);
     if (error) Alert.alert("Ошибка", "Не удалось загрузить жалобы: " + error.message);
     else setAdminReports(data || []);
+    if (bansError) Alert.alert("Ошибка", "Не удалось загрузить блокировки: " + bansError.message);
+    else setAdminBans(bans || []);
     setReportsLoading(false);
+  };
+
+  const setUserBan = async (userId: string, mode: "10days" | "permanent") => {
+    if (!isAdmin || !userId || banSaving) return;
+    setBanSaving(true);
+    const bannedUntil = mode === "10days" ? new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() : null;
+    const { error } = await supabase.from("user_bans").upsert({ user_id: userId, reason: mode === "10days" ? "Блокировка модератором на 10 дней" : "Постоянная блокировка модератором", banned_until: bannedUntil, is_permanent: mode === "permanent", created_by: session?.user?.id || null }, { onConflict: "user_id" });
+    setBanSaving(false);
+    if (error) { Alert.alert("Ошибка", "Не удалось заблокировать пользователя: " + error.message); return; }
+    await loadAdminReports();
+    Alert.alert("Готово", mode === "10days" ? "Аккаунт заблокирован на 10 дней." : "Аккаунт заблокирован навсегда.");
+  };
+
+  const unbanUser = async (userId: string) => {
+    if (!isAdmin || !userId || banSaving) return;
+    setBanSaving(true);
+    const { error } = await supabase.from("user_bans").delete().eq("user_id", userId);
+    setBanSaving(false);
+    if (error) { Alert.alert("Ошибка", "Не удалось снять блокировку: " + error.message); return; }
+    setAdminBans((items) => items.filter((item) => item.user_id !== userId));
+    Alert.alert("Готово", "Блокировка аккаунта снята.");
   };
 
   const markReportReviewed = async (reportId: number) => {
@@ -1294,12 +1322,22 @@ export default function App() {
           </View>
           {reportsLoading ? <ActivityIndicator size="large" color="#F36B32" /> : adminReports.length === 0 ? <Text style={styles.formHint}>Пока жалоб нет.</Text> : adminReports.map((report) => {
             const ad = listings.find((item) => item.id === Number(report.ad_id));
+            const targetBan = ad?.userId ? adminBans.find((item) => item.user_id === ad.userId) : null;
+            const banActive = !!targetBan && (targetBan.is_permanent || !targetBan.banned_until || new Date(targetBan.banned_until).getTime() > Date.now());
             return <View key={report.id} style={[styles.profileCard, { alignItems: "stretch", marginBottom: 12 }]}>
               <Text style={{ color: "#20242B", fontWeight: "900", fontSize: 15 }}>{ad?.title || "Объявление №" + report.ad_id}</Text>
               <Text style={styles.formHint}>Причина: {report.reason}</Text>
               <Text style={styles.formHint}>Дата: {report.created_at ? new Date(report.created_at).toLocaleString("ru-RU") : "—"}</Text>
               <Text style={{ color: report.status === "reviewed" ? "#218838" : "#D94F1B", fontWeight: "800", marginTop: 5 }}>{report.status === "reviewed" ? "Рассмотрена" : "Новая"}</Text>
               {ad ? <Pressable onPress={() => showAdDetails(ad)} style={{ paddingVertical: 10 }}><Text style={styles.seeAll}>Открыть объявление</Text></Pressable> : null}
+              {ad?.userId ? <>
+                <Text style={{ color: "#20242B", fontWeight: "800", marginTop: 8 }}>Аккаунт нарушителя</Text>
+                {banActive ? <Text style={{ color: "#D94F1B", fontWeight: "800", marginTop: 5 }}>{targetBan.is_permanent ? "Заблокирован навсегда" : "Заблокирован до " + new Date(targetBan.banned_until).toLocaleString("ru-RU")}</Text> : <Text style={styles.formHint}>Аккаунт не заблокирован</Text>}
+                {banActive ? <Pressable style={[styles.publishButton, { backgroundColor: "#218838" }]} disabled={banSaving} onPress={() => unbanUser(ad.userId)}><Text style={styles.publishButtonText}>{banSaving ? "Подождите..." : "Снять блокировку"}</Text></Pressable> : <>
+                  <Pressable style={styles.publishButton} disabled={banSaving} onPress={() => setUserBan(ad.userId, "10days")}><Text style={styles.publishButtonText}>{banSaving ? "Подождите..." : "Заблокировать на 10 дней"}</Text></Pressable>
+                  <Pressable style={[styles.publishButton, { backgroundColor: "#B42318" }]} disabled={banSaving} onPress={() => setUserBan(ad.userId, "permanent")}><Text style={styles.publishButtonText}>{banSaving ? "Подождите..." : "Заблокировать навсегда"}</Text></Pressable>
+                </>}
+              </> : <Text style={styles.formHint}>Не удалось определить аккаунт владельца объявления.</Text>}
               {report.status !== "reviewed" ? <Pressable style={styles.publishButton} onPress={() => markReportReviewed(report.id)}><Text style={styles.publishButtonText}>Отметить рассмотренной</Text></Pressable> : null}
             </View>;
           })}
