@@ -403,6 +403,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("ads")
       .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -610,8 +611,9 @@ export default function App() {
     setChatLoading(true);
     const { data: ownerAd, error: ownerError } = await supabase
       .from("ads")
-      .select("user_id")
+      .select("user_id, deleted_at")
       .eq("id", item.id)
+      .is("deleted_at", null)
       .limit(1)
       .maybeSingle();
     if (ownerError || !ownerAd?.user_id) {
@@ -868,6 +870,7 @@ export default function App() {
       .from("ads")
       .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
       .eq("user_id", session.user.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
     setMyAdsLoading(false);
     if (error) {
@@ -938,7 +941,12 @@ export default function App() {
   const deleteMyAd = async () => {
     if (deleteAdId === null || !session?.user?.id) return;
     setDeletingAd(true);
-    const { error } = await supabase.from("ads").delete().eq("id", deleteAdId).eq("user_id", session.user.id);
+    const { error } = await supabase
+      .from("ads")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", deleteAdId)
+      .eq("user_id", session.user.id)
+      .is("deleted_at", null);
     setDeletingAd(false);
     if (error) {
       setDeleteAdId(null);
