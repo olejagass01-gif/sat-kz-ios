@@ -185,7 +185,7 @@ export default function App() {
     return () => { active = false; };
   }, [session?.user?.id]);
 
-  const isAdmin = (session?.user?.email || "").toLowerCase() === "azira.76.alimhanova@gmail.com";
+  const isAdmin = (session?.user?.email || "").toLowerCase() === "jazira.76.alimhanova@gmail.com";
 
   const loadAdminReports = async () => {
     if (!isAdmin) return;
