@@ -385,7 +385,15 @@ export default function App() {
 
   const showReportOptions = () => {
     if (!selectedListing || reportSaving) return;
-    setReportReason((current) => current === null ? "" : null);
+    Alert.alert("Пожаловаться на объявление", "Выберите причину жалобы:", [
+      { text: "Мошенничество", onPress: () => reportListing("Мошенничество") },
+      { text: "Неверная информация", onPress: () => reportListing("Неверная информация") },
+      { text: "Другие причины", onPress: () => Alert.alert("Другие причины", "Выберите причину:", [
+        { text: "Запрещённый товар", onPress: () => reportListing("Запрещённый товар") },
+        { text: "Спам или дубликат", onPress: () => reportListing("Спам или дубликат") },
+        { text: "Другая причина", onPress: () => reportListing("Другая причина") },
+      ]) },
+    ]);
   };
 
   const showAdDetails = (item: Listing) => {
