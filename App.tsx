@@ -385,15 +385,7 @@ export default function App() {
 
   const showReportOptions = () => {
     if (!selectedListing || reportSaving) return;
-    Alert.alert("Пожаловаться на объявление", "Выберите причину жалобы:", [
-      { text: "Мошенничество", onPress: () => reportListing("Мошенничество") },
-      { text: "Неверная информация", onPress: () => reportListing("Неверная информация") },
-      { text: "Другие причины", onPress: () => Alert.alert("Другие причины", "Выберите причину:", [
-        { text: "Запрещённый товар", onPress: () => reportListing("Запрещённый товар") },
-        { text: "Спам или дубликат", onPress: () => reportListing("Спам или дубликат") },
-        { text: "Другая причина", onPress: () => reportListing("Другая причина") },
-      ]) },
-    ]);
+    setReportReason("");
   };
 
   const showAdDetails = (item: Listing) => {
@@ -1471,6 +1463,26 @@ export default function App() {
                 <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
               </Pressable> : null}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={reportReason !== null} transparent animationType="fade" onRequestClose={() => setReportReason(null)}>
+        <View style={[styles.modalBackdrop, { justifyContent: "center", padding: 22 }]}>
+          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 18, padding: 20, width: "100%" }}>
+            <Text style={styles.detailsTitle}>Пожаловаться на объявление</Text>
+            <Text style={{ color: "#737B86", fontSize: 13, marginBottom: 12 }}>Выберите причину:</Text>
+            {["Мошенничество", "Неверная информация", "Запрещённый товар", "Спам или дубликат", "Другая причина"].map((reason) => (
+              <Pressable key={reason} onPress={() => setReportReason(reason)} style={{ minHeight: 50, justifyContent: "center", paddingHorizontal: 12, marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA", backgroundColor: reportReason === reason ? "#FFF0E9" : "#FFFFFF" }}>
+                <Text style={{ color: "#20242B", fontSize: 15, fontWeight: reportReason === reason ? "800" : "500" }}>{reportReason === reason ? "●  " : "○  "}{reason}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => reportReason && reportListing(reportReason)} disabled={!reportReason || reportSaving} style={[styles.publishButton, { marginTop: 8, opacity: !reportReason || reportSaving ? 0.5 : 1 }]}>
+              {reportSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Отправить жалобу</Text>}
+            </Pressable>
+            <Pressable onPress={() => setReportReason(null)} disabled={reportSaving} style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
+              <Text style={{ color: "#737B86", fontWeight: "700" }}>Отмена</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
