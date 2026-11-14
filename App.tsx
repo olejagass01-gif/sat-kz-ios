@@ -1468,10 +1468,13 @@ export default function App() {
             <Text style={styles.detailsTitle}>Пожаловаться на объявление</Text>
             <Text style={{ color: "#737B86", fontSize: 13, marginBottom: 12 }}>Выберите причину:</Text>
             {["Мошенничество", "Неверная информация", "Запрещённый товар", "Спам или дубликат", "Другая причина"].map((reason) => (
-              <Pressable key={reason} onPress={() => reportListing(reason)} disabled={reportSaving} style={{ minHeight: 50, justifyContent: "center", paddingHorizontal: 12, marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: "#E3E6EA", backgroundColor: "#FFFFFF", opacity: reportSaving ? 0.5 : 1 }}>
-                <Text style={{ color: "#20242B", fontSize: 15, fontWeight: "600" }}>{reason}</Text>
+              <Pressable key={reason} onPress={() => setReportReason(reason)} disabled={reportSaving} style={{ minHeight: 50, justifyContent: "center", paddingHorizontal: 12, marginBottom: 8, borderRadius: 10, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA", backgroundColor: reportReason === reason ? "#FFF1E9" : "#FFFFFF", opacity: reportSaving ? 0.5 : 1 }}>
+                <Text style={{ color: "#20242B", fontSize: 15, fontWeight: "600" }}>{reportReason === reason ? "✓ " : ""}{reason}</Text>
               </Pressable>
             ))}
+            <Pressable onPress={() => reportReason && reportListing(reportReason)} disabled={!reportReason || reportSaving} style={{ minHeight: 50, alignItems: "center", justifyContent: "center", marginTop: 8, borderRadius: 12, backgroundColor: !reportReason || reportSaving ? "#B9BEC5" : "#F36B32" }}>
+              <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 15 }}>{reportSaving ? "Отправляем..." : "Отправить жалобу"}</Text>
+            </Pressable>
             <Pressable onPress={() => { setReportReason(null); setReportTarget(null); }} disabled={reportSaving} style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
               <Text style={{ color: "#737B86", fontWeight: "700" }}>Отмена</Text>
             </Pressable>
