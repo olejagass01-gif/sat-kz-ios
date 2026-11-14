@@ -387,6 +387,7 @@ export default function App() {
   };
 
   const markReportReviewed = async (reportId: number) => {
+    if (!isAdmin || !reportId) return;
     const { error } = await supabase.from("ad_reports").update({ status: "reviewed" }).eq("id", reportId);
     if (error) { Alert.alert("Ошибка", "Не удалось обновить жалобу: " + error.message); return; }
     setAdminReports((items) => items.map((item) => item.id === reportId ? { ...item, status: "reviewed" } : item));
