@@ -190,6 +190,22 @@ export default function App() {
 
   const isAdmin = (session?.user?.email || "").toLowerCase() === "jazira.76.alimhanova@gmail.com";
 
+  useEffect(() => {
+    if (!session?.user?.id || isAdmin) return;
+    let active = true;
+    const checkAccountBan = async () => {
+      const { data, error } = await supabase.from("user_bans").select("banned_until, is_permanent").eq("user_id", session.user.id).maybeSingle();
+      if (!active || error || !data) return;
+      const stillBanned = data.is_permanent || !data.banned_until || new Date(data.banned_until).getTime() > Date.now();
+      if (stillBanned) {
+        await supabase.auth.signOut();
+        if (active) Alert.alert("Аккаунт заблокирован", data.is_permanent ? "Ваш аккаунт заблокирован навсегда за нарушение правил SAT KZ." : "Ваш аккаунт заблокирован до " + new Date(data.banned_until).toLocaleString("ru-RU") + ".");
+      }
+    };
+    checkAccountBan();
+    return () => { active = false; };
+  }, [session?.user?.id, isAdmin]);
+
   const loadAdminReports = async () => {
     if (!isAdmin) return;
     setReportsLoading(true);
