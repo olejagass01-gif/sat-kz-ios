@@ -1190,6 +1190,11 @@ export default function App() {
               <Pressable style={styles.publishButton} onPress={loadMyAds}>
                 <Text style={styles.publishButtonText}>Обновить мои объявления</Text>
               </Pressable>
+              {isAdmin && (
+                <Pressable style={[styles.publishButton, { backgroundColor: "#20242B", marginTop: 10 }]} onPress={() => { setTab("Жалобы"); loadAdminReports(); }}>
+                  <Text style={styles.publishButtonText}>🚩 Открыть жалобы</Text>
+                </Pressable>
+              )}
               <Text style={[styles.fieldLabel, { marginTop: 24 }]}>Мои объявления</Text>
               {myAdsLoading ? <ActivityIndicator color="#F36B32" /> : myAds.length === 0 ? (
                 <Text style={styles.formHint}>У вас пока нет опубликованных объявлений. Нажмите «Обновить мои объявления».</Text>
