@@ -1425,19 +1425,6 @@ export default function App() {
                   <Text style={{ color: "#D94F1B", fontSize: 13, fontWeight: "700" }}>{reportSaving ? "Отправка жалобы..." : "⚑ Пожаловаться на объявление"}</Text>
                 </Pressable>
               ) : null}
-              {reportReason !== null ? (
-                <View style={{ backgroundColor: "#F7F8FA", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                  <Text style={{ color: "#20242B", fontWeight: "800", marginBottom: 8 }}>Выберите причину жалобы</Text>
-                  {["Мошенничество", "Неверная информация", "Запрещённый товар", "Спам или дубликат", "Другая причина"].map((reason) => (
-                    <Pressable key={reason} onPress={() => setReportReason(reason)} hitSlop={6} pressRetentionOffset={20} style={{ minHeight: 48, justifyContent: "center", paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, backgroundColor: reportReason === reason ? "#FCE5DA" : "#FFFFFF", marginBottom: 7, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA" }}>
-                      <Text style={{ color: "#20242B", fontWeight: reportReason === reason ? "800" : "500" }}>{reportReason === reason ? "● " : "○ "}{reason}</Text>
-                    </Pressable>
-                  ))}
-                  <Pressable onPress={() => reportListing(reportReason)} disabled={!reportReason || reportSaving} hitSlop={8} pressRetentionOffset={20} style={[styles.publishButton, { minHeight: 56, marginTop: 8, marginBottom: 6, opacity: !reportReason || reportSaving ? 0.5 : 1 }]}>
-                    {reportSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Отправить жалобу</Text>}
-                  </Pressable>
-                </View>
-              ) : null}
               <Text style={styles.detailsLabel}>Отзывы покупателей</Text>
               {sellerReviews.map((review) => (
                 <View key={review.id} style={{ paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#F0F1F3" }}>
