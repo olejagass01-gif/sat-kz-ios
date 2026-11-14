@@ -296,6 +296,13 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.error("SAT KZ service worker registration failed:", error);
+    });
+  }, []);
+
+  useEffect(() => {
     try {
       const savedLanguage = globalThis.localStorage?.getItem("sat-kz-language");
       if (savedLanguage === "ru" || savedLanguage === "kk") setLanguage(savedLanguage);
