@@ -475,7 +475,7 @@ export default function App() {
         return;
       }
       const [profileResult, reviewsResult] = await Promise.all([
-        supabase.from("profiles").select("display_name, avatar_url, city").eq("id", selectedListing.userId).maybeSingle(),
+        supabase.from("public_profiles").select("display_name, avatar_url, city").eq("id", selectedListing.userId).maybeSingle(),
         supabase.from("seller_reviews").select("id, reviewer_id, rating, comment, created_at").eq("seller_id", selectedListing.userId).order("created_at", { ascending: false }),
       ]);
       if (!active) return;
@@ -484,7 +484,7 @@ export default function App() {
       const reviewerIds = [...new Set(reviews.map((review: any) => review.reviewer_id))];
       let names: Record<string, string> = {};
       if (reviewerIds.length) {
-        const { data: people } = await supabase.from("profiles").select("id, display_name").in("id", reviewerIds);
+        const { data: people } = await supabase.from("public_profiles").select("id, display_name").in("id", reviewerIds);
         (people || []).forEach((person: any) => { names[person.id] = person.display_name || "Пользователь SAT KZ"; });
       }
       if (!active) return;
@@ -525,7 +525,7 @@ export default function App() {
     const ids = [...new Set(rows.map((review: any) => review.reviewer_id))];
     let names: Record<string, string> = {};
     if (ids.length) {
-      const { data: people } = await supabase.from("profiles").select("id, display_name").in("id", ids);
+      const { data: people } = await supabase.from("public_profiles").select("id, display_name").in("id", ids);
       (people || []).forEach((person: any) => { names[person.id] = person.display_name || "Пользователь SAT KZ"; });
     }
     setSellerReviews(rows.map((review: any) => ({ ...review, reviewerName: names[review.reviewer_id] || "Пользователь SAT KZ" })));
@@ -650,7 +650,7 @@ export default function App() {
       conversationId = created.id;
     }
     setSelectedListing(null);
-    const { data: sellerProfile } = await supabase.from("profiles").select("display_name").eq("id", sellerId).maybeSingle();
+    const { data: sellerProfile } = await supabase.from("public_profiles").select("display_name").eq("id", sellerId).maybeSingle();
     setActiveConversation({ id: conversationId, adId: item.id, adTitle: item.title, sellerId, otherUserId: sellerId, otherUserName: sellerProfile?.display_name || "Пользователь SAT KZ" });
     setChatDraft("");
     await loadChatMessages(conversationId);
@@ -671,7 +671,7 @@ export default function App() {
     const messages = data || [];
     const senderIds = [...new Set(messages.map((message: any) => message.sender_id).filter(Boolean))];
     const { data: profiles } = senderIds.length
-      ? await supabase.from("profiles").select("id, display_name").in("id", senderIds)
+      ? await supabase.from("public_profiles").select("id, display_name").in("id", senderIds)
       : { data: [] };
     const names: Record<string, string> = {};
     (profiles || []).forEach((profile: any) => { names[profile.id] = profile.display_name; });
@@ -749,7 +749,7 @@ export default function App() {
     }
     const otherIds = [...new Set(rows.map((row: any) => row.buyer_id === session.user.id ? row.seller_id : row.buyer_id).filter(Boolean))];
     const { data: profileRows } = otherIds.length
-      ? await supabase.from("profiles").select("id, display_name").in("id", otherIds)
+      ? await supabase.from("public_profiles").select("id, display_name").in("id", otherIds)
       : { data: [] };
     const profileById: Record<string, string> = {};
     (profileRows || []).forEach((profile: any) => { profileById[profile.id] = profile.display_name; });
