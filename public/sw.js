@@ -9,8 +9,6 @@ self.addEventListener("push", (event) => {
   const title = data.title || "SAT KZ";
   const options = {
     body: data.body || "У вас новое сообщение",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
     data: { url: data.url || "/" },
     tag: data.tag || "sat-kz-message",
     renotify: true,
