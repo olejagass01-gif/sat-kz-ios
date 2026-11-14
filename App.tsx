@@ -141,6 +141,8 @@ export default function App() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reportSaving, setReportSaving] = useState(false);
   const [reportReason, setReportReason] = useState<string | null>(null);
+  const [adminReports, setAdminReports] = useState<any[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [editingAdId, setEditingAdId] = useState<number | null>(null);
@@ -182,6 +184,23 @@ export default function App() {
     });
     return () => { active = false; };
   }, [session?.user?.id]);
+
+  const isAdmin = (session?.user?.email || "").toLowerCase() === "azira.76.alimhanova@gmail.com";
+
+  const loadAdminReports = async () => {
+    if (!isAdmin) return;
+    setReportsLoading(true);
+    const { data, error } = await supabase.from("ad_reports").select("*").order("created_at", { ascending: false });
+    if (error) Alert.alert("Ошибка", "Не удалось загрузить жалобы: " + error.message);
+    else setAdminReports(data || []);
+    setReportsLoading(false);
+  };
+
+  const markReportReviewed = async (reportId: number) => {
+    const { error } = await supabase.from("ad_reports").update({ status: "reviewed" }).eq("id", reportId);
+    if (error) { Alert.alert("Ошибка", "Не удалось обновить жалобу: " + error.message); return; }
+    setAdminReports((items) => items.map((item) => item.id === reportId ? { ...item, status: "reviewed" } : item));
+  };
 
   const loadListings = async () => {
     setLoading(true);
@@ -1254,6 +1273,24 @@ export default function App() {
             </View>
           ))}
         </ScrollView>
+      ) : tab === "Жалобы" && isAdmin ? (
+        <ScrollView contentContainerStyle={styles.formContent}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.formTitle}>Жалобы</Text>
+            <Pressable onPress={loadAdminReports}><Text style={styles.seeAll}>Обновить</Text></Pressable>
+          </View>
+          {reportsLoading ? <ActivityIndicator size="large" color="#F36B32" /> : adminReports.length === 0 ? <Text style={styles.formHint}>Пока жалоб нет.</Text> : adminReports.map((report) => {
+            const ad = listings.find((item) => item.id === Number(report.ad_id));
+            return <View key={report.id} style={[styles.profileCard, { alignItems: "stretch", marginBottom: 12 }]}>
+              <Text style={{ color: "#20242B", fontWeight: "900", fontSize: 15 }}>{ad?.title || "Объявление №" + report.ad_id}</Text>
+              <Text style={styles.formHint}>Причина: {report.reason}</Text>
+              <Text style={styles.formHint}>Дата: {report.created_at ? new Date(report.created_at).toLocaleString("ru-RU") : "—"}</Text>
+              <Text style={{ color: report.status === "reviewed" ? "#218838" : "#D94F1B", fontWeight: "800", marginTop: 5 }}>{report.status === "reviewed" ? "Рассмотрена" : "Новая"}</Text>
+              {ad ? <Pressable onPress={() => showAdDetails(ad)} style={{ paddingVertical: 10 }}><Text style={styles.seeAll}>Открыть объявление</Text></Pressable> : null}
+              {report.status !== "reviewed" ? <Pressable style={styles.publishButton} onPress={() => markReportReviewed(report.id)}><Text style={styles.publishButtonText}>Отметить рассмотренной</Text></Pressable> : null}
+            </View>;
+          })}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
           {activeConversation ? (
@@ -1433,12 +1470,13 @@ export default function App() {
             ["Добавить", "add-circle"],
             ["Сообщения", "chatbubble-ellipses-outline"],
             ["Профиль", "person-outline"],
+            ...(isAdmin ? [["Жалобы", "flag-outline"] as const] : []),
           ] as const
         ).map(([label, icon]) => (
           <Pressable
             key={label}
             style={styles.tabItem}
-            onPress={() => setTab(label)}
+            onPress={() => { setTab(label); if (label === "Жалобы") loadAdminReports(); }}
           >
             <View style={{ position: "relative" }}>
               <Ionicons
