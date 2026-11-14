@@ -1397,7 +1397,7 @@ export default function App() {
       <Modal visible={!!selectedListing} transparent animationType="slide" onRequestClose={() => setSelectedListing(null)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.detailsSheet, { height: "90%", maxHeight: "90%" }]}>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 18 }} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="always" nestedScrollEnabled>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="always" scrollEventThrottle={16}>
               <Pressable style={styles.modalClose} onPress={() => { setReportReason(null); setSelectedListing(null); }}>
                 <Ionicons name="close" size={25} color="#20242B" />
               </Pressable>
@@ -1421,7 +1421,7 @@ export default function App() {
                 {sellerReviews.length ? "★ " + (sellerReviews.reduce((sum, review) => sum + review.rating, 0) / sellerReviews.length).toFixed(1) + " · " + sellerReviews.length + " отзыв(ов)" : "Пока нет отзывов"}
               </Text>
               {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? (
-                <Pressable onPress={showReportOptions} disabled={reportSaving} style={{ alignSelf: "flex-start", paddingVertical: 9, marginBottom: 4 }}>
+                <Pressable onPress={showReportOptions} disabled={reportSaving} hitSlop={10} pressRetentionOffset={20} style={{ alignSelf: "stretch", minHeight: 48, justifyContent: "center", paddingVertical: 10, paddingHorizontal: 8, marginBottom: 6, backgroundColor: "#FFF7F3", borderRadius: 10 }}>
                   <Text style={{ color: "#D94F1B", fontSize: 13, fontWeight: "700" }}>{reportSaving ? "Отправка жалобы..." : "⚑ Пожаловаться на объявление"}</Text>
                 </Pressable>
               ) : null}
@@ -1429,11 +1429,11 @@ export default function App() {
                 <View style={{ backgroundColor: "#F7F8FA", borderRadius: 12, padding: 12, marginBottom: 12 }}>
                   <Text style={{ color: "#20242B", fontWeight: "800", marginBottom: 8 }}>Выберите причину жалобы</Text>
                   {["Мошенничество", "Неверная информация", "Запрещённый товар", "Спам или дубликат", "Другая причина"].map((reason) => (
-                    <Pressable key={reason} onPress={() => setReportReason(reason)} style={{ paddingVertical: 10, paddingHorizontal: 8, borderRadius: 8, backgroundColor: reportReason === reason ? "#FCE5DA" : "#FFFFFF", marginBottom: 5, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA" }}>
+                    <Pressable key={reason} onPress={() => setReportReason(reason)} hitSlop={6} pressRetentionOffset={20} style={{ minHeight: 48, justifyContent: "center", paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, backgroundColor: reportReason === reason ? "#FCE5DA" : "#FFFFFF", marginBottom: 7, borderWidth: 1, borderColor: reportReason === reason ? "#F36B32" : "#E3E6EA" }}>
                       <Text style={{ color: "#20242B", fontWeight: reportReason === reason ? "800" : "500" }}>{reportReason === reason ? "● " : "○ "}{reason}</Text>
                     </Pressable>
                   ))}
-                  <Pressable onPress={() => reportListing(reportReason)} disabled={!reportReason || reportSaving} style={[styles.publishButton, { marginTop: 6, opacity: !reportReason || reportSaving ? 0.5 : 1 }]}>
+                  <Pressable onPress={() => reportListing(reportReason)} disabled={!reportReason || reportSaving} hitSlop={8} pressRetentionOffset={20} style={[styles.publishButton, { minHeight: 56, marginTop: 8, marginBottom: 6, opacity: !reportReason || reportSaving ? 0.5 : 1 }]}>
                     {reportSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Отправить жалобу</Text>}
                   </Pressable>
                 </View>
