@@ -141,6 +141,7 @@ export default function App() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reportSaving, setReportSaving] = useState(false);
   const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<Listing | null>(null);
   const [adminReports, setAdminReports] = useState<any[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [adImages, setAdImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -354,7 +355,10 @@ export default function App() {
   };
 
   const reportListing = async (reason: string) => {
-    if (!selectedListing) return;
+    if (!reportTarget) {
+      Alert.alert("Ошибка", "Не удалось определить объявление. Закройте окно и попробуйте ещё раз.");
+      return;
+    }
     if (!session?.user?.id) {
       Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы пожаловаться на объявление.");
       return;
@@ -362,7 +366,7 @@ export default function App() {
     setReportSaving(true);
     try {
       const { error } = await supabase.from("ad_reports").insert({
-        ad_id: selectedListing.id,
+        ad_id: reportTarget.id,
         reporter_id: session.user.id,
         reason,
       });
@@ -375,6 +379,7 @@ export default function App() {
         return;
       }
       setReportReason(null);
+      setReportTarget(null);
       Alert.alert("Жалоба отправлена", "Спасибо! Мы проверим это объявление.");
     } catch (error: any) {
       Alert.alert("Ошибка отправки жалобы", error?.message || "Не удалось связаться с сервером.");
@@ -385,11 +390,14 @@ export default function App() {
 
   const showReportOptions = () => {
     if (!selectedListing || reportSaving) return;
+    setReportTarget(selectedListing);
+    setSelectedListing(null);
     setReportReason("");
   };
 
   const showAdDetails = (item: Listing) => {
     setReportReason(null);
+    setReportTarget(null);
     setSelectedListing(item);
   };
 
@@ -1464,7 +1472,7 @@ export default function App() {
                 <Text style={{ color: "#20242B", fontSize: 15, fontWeight: "600" }}>{reason}</Text>
               </Pressable>
             ))}
-            <Pressable onPress={() => setReportReason(null)} disabled={reportSaving} style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
+            <Pressable onPress={() => { setReportReason(null); setReportTarget(null); }} disabled={reportSaving} style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
               <Text style={{ color: "#737B86", fontWeight: "700" }}>Отмена</Text>
             </Pressable>
           </View>
