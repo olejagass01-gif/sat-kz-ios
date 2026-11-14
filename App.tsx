@@ -264,6 +264,7 @@ export default function App() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -339,6 +340,51 @@ export default function App() {
     });
     return () => { active = false; };
   }, [session?.user?.id]);
+
+  const enablePushNotifications = async () => {
+    if (!session?.user?.id || pushBusy) return;
+    if (typeof window === "undefined" || !("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
+      Alert.alert("Недоступно", "Push-уведомления доступны на поддерживаемом устройстве. На iPhone откройте SAT KZ с иконки на главном экране.");
+      return;
+    }
+    setPushBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        Alert.alert("Уведомления выключены", "Разрешите уведомления SAT KZ в настройках устройства.");
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        const applicationServerKey = Uint8Array.from(
+          atob("BNsYxz2YvuF500Kh3HxJ5XuzBO6E3mw8XeBv5CtHSgYr6Hfkizr6N_cMkszh05aokCWHOa4G1MQhMm5ZoIXBlZM".replace(/-/g, "+").replace(/_/g, "/")),
+          (char) => char.charCodeAt(0)
+        );
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      }
+      const subscriptionData = subscription.toJSON();
+      if (!subscriptionData.endpoint || !subscriptionData.keys?.p256dh || !subscriptionData.keys?.auth) {
+        throw new Error("Не удалось получить данные push-подписки.");
+      }
+      const { error } = await supabase.from("push_subscriptions").upsert({
+        user_id: session.user.id,
+        endpoint: subscriptionData.endpoint,
+        p256dh: subscriptionData.keys.p256dh,
+        auth: subscriptionData.keys.auth,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "endpoint" });
+      if (error) throw error;
+      Alert.alert("Готово", "Уведомления о новых сообщениях включены.");
+    } catch (error: any) {
+      Alert.alert("Ошибка", "Не удалось включить уведомления: " + (error?.message || "попробуйте ещё раз."));
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const isAdmin = (session?.user?.email || "").toLowerCase() === "jazira.76.alimhanova@gmail.com";
 
@@ -1406,6 +1452,9 @@ export default function App() {
                     <Text style={{ color: "#68707C", fontSize: 13, marginTop: 4 }}>{profileCity || "Город не указан"}</Text>
                     <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 14 }]} onPress={() => setProfileEditing(true)}>
                       <Text style={styles.publishButtonText}>Редактировать профиль</Text>
+                    </Pressable>
+                    <Pressable style={[styles.publishButton, { alignSelf: "stretch", marginTop: 10, backgroundColor: "#20242B" }]} onPress={enablePushNotifications} disabled={pushBusy}>
+                      {pushBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Включить уведомления о сообщениях</Text>}
                     </Pressable>
                   </>
                 )}
