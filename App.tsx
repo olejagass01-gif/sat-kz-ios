@@ -368,8 +368,10 @@ export default function App() {
   const setUserBan = async (userId: string, mode: "10days" | "permanent") => {
     if (!isAdmin || !userId || banSaving) return;
     setBanSaving(true);
-    const bannedUntil = mode === "10days" ? new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() : null;
-    const { error } = await supabase.from("user_bans").upsert({ user_id: userId, reason: mode === "10days" ? "Блокировка модератором на 10 дней" : "Постоянная блокировка модератором", banned_until: bannedUntil, is_permanent: mode === "permanent", created_by: session?.user?.id || null }, { onConflict: "user_id" });
+    const { error } = await supabase.rpc("admin_set_user_ban", {
+      p_user_id: userId,
+      p_mode: mode,
+    });
     setBanSaving(false);
     if (error) { Alert.alert("Ошибка", "Не удалось заблокировать пользователя: " + error.message); return; }
     await loadAdminReports();
@@ -379,7 +381,9 @@ export default function App() {
   const unbanUser = async (userId: string) => {
     if (!isAdmin || !userId || banSaving) return;
     setBanSaving(true);
-    const { error } = await supabase.from("user_bans").delete().eq("user_id", userId);
+    const { error } = await supabase.rpc("admin_unban_user", {
+      p_user_id: userId,
+    });
     setBanSaving(false);
     if (error) { Alert.alert("Ошибка", "Не удалось снять блокировку: " + error.message); return; }
     setAdminBans((items) => items.filter((item) => item.user_id !== userId));
