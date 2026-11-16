@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
+  AppState,
+  Platform,
   View,
   Text as NativeText,
   TextInput as NativeTextInput,
@@ -16,6 +18,7 @@ import {
   Image,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
 import "react-native-url-polyfill/auto";
@@ -154,7 +157,15 @@ const TextInput = (props: any) => <NativeTextInput {...props} placeholder={trans
 
 const supabase = createClient(
   "https://sgpbkamcfviwysfoayui.supabase.co",
-  "sb_publishable_iA-uqsk7PoEuZY0Z2quAAA_WiTmOjS4"
+  "sb_publishable_iA-uqsk7PoEuZY0Z2quAAA_WiTmOjS4",
+  {
+    auth: {
+      storage: Platform.OS === "web" ? undefined : AsyncStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: Platform.OS === "web",
+    },
+  }
 );
 
 type Listing = {
@@ -318,6 +329,22 @@ export default function App() {
     activeAppLanguage = language;
     try { globalThis.localStorage?.setItem("sat-kz-language", language); } catch {}
   }, [language]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    const syncAuthRefresh = (state: string) => {
+      if (state === "active") {
+        supabase.auth.startAutoRefresh();
+      } else {
+        supabase.auth.stopAutoRefresh();
+      }
+    };
+
+    syncAuthRefresh(AppState.currentState);
+    const subscription = AppState.addEventListener("change", syncAuthRefresh);
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     loadListings();
