@@ -957,15 +957,26 @@ export default function App() {
     setMyAdsLoading(true);
     const { data, error } = await supabase
       .from("ads")
-      .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
+      .select("id, user_id, title, description, price, city, category, image_url, created_at")
       .eq("user_id", session.user.id)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
-    setMyAdsLoading(false);
     if (error) {
+      setMyAdsLoading(false);
       Alert.alert("Ошибка", "Не удалось загрузить ваши объявления.");
       return;
     }
+
+    const adIds = (data || []).map((item) => Number(item.id));
+    const { data: phoneRows, error: phoneError } = adIds.length
+      ? await supabase.rpc("get_my_ad_phones", { p_ad_ids: adIds })
+      : { data: [], error: null };
+    setMyAdsLoading(false);
+    if (phoneError) {
+      Alert.alert("Ошибка", "Не удалось безопасно загрузить номера ваших объявлений.");
+      return;
+    }
+    const phoneByAdId = new Map((phoneRows || []).map((row: any) => [Number(row.ad_id), row.phone || ""]));
     setMyAds((data || []).map((item) => ({
       id: Number(item.id),
       userId: item.user_id || "",
@@ -976,7 +987,7 @@ export default function App() {
       emoji: getEmoji(item.category || ""),
       time: formatTime(item.created_at),
       description: item.description || "",
-      phone: item.phone || "",
+      phone: phoneByAdId.get(Number(item.id)) || "",
       imageUrls: (() => { try { const v = JSON.parse(item.image_url || "[]"); return Array.isArray(v) ? v : item.image_url ? [item.image_url] : []; } catch { return item.image_url ? [item.image_url] : []; } })(),
     })));
   };
