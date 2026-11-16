@@ -270,6 +270,8 @@ export default function App() {
   const [myAds, setMyAds] = useState<Listing[]>([]);
   const [myAdsLoading, setMyAdsLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [revealedPhone, setRevealedPhone] = useState("");
+  const [phoneRevealLoading, setPhoneRevealLoading] = useState(false);
   const [sellerReviews, setSellerReviews] = useState<any[]>([]);
   const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -476,7 +478,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from("ads")
-      .select("id, user_id, title, description, phone, price, city, category, image_url, created_at")
+      .select("id, user_id, title, description, price, city, category, image_url, created_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
@@ -502,7 +504,7 @@ export default function App() {
       emoji: getEmoji(item.category || ""),
       time: formatTime(item.created_at),
       description: item.description || "",
-      phone: item.phone || "",
+      phone: "",
       imageUrls: (() => { try { const v = JSON.parse(item.image_url || "[]"); return Array.isArray(v) ? v : item.image_url ? [item.image_url] : []; } catch { return item.image_url ? [item.image_url] : []; } })(),
     }));
 
@@ -665,9 +667,28 @@ export default function App() {
   };
 
   const showAdDetails = (item: Listing) => {
+    setRevealedPhone("");
+    setPhoneRevealLoading(false);
     setReportReason(null);
     setReportTarget(null);
     setSelectedListing(item);
+  };
+
+  const revealSellerPhone = async () => {
+    if (!selectedListing || phoneRevealLoading) return;
+    if (!session?.user?.id) {
+      Alert.alert("Нужен вход", "Войдите в аккаунт, чтобы посмотреть номер продавца.");
+      setTab("Профиль");
+      return;
+    }
+    setPhoneRevealLoading(true);
+    const { data, error } = await supabase.rpc("get_ad_phone", { p_ad_id: selectedListing.id });
+    setPhoneRevealLoading(false);
+    if (error || !data) {
+      Alert.alert("Не удалось получить номер", error?.message || "Номер не найден.");
+      return;
+    }
+    setRevealedPhone(String(data));
   };
 
   const openChat = async (item: Listing) => {
@@ -1711,7 +1732,7 @@ export default function App() {
               <Text style={styles.detailsLabel}>Описание</Text>
               <Text style={styles.detailsDescription}>{selectedListing?.description || "Описание не указано"}</Text>
               <Text style={styles.detailsLabel}>Телефон продавца</Text>
-              <Text style={styles.detailsDescription}>{selectedListing?.phone || "Не указан"}</Text>
+              <Text style={styles.detailsDescription}>{revealedPhone || "Номер скрыт до нажатия кнопки"}</Text>
               <Text style={styles.detailsLabel}>Продавец</Text>
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                 {sellerProfile?.avatar_url ? <Image source={{ uri: sellerProfile.avatar_url }} style={{ width: 42, height: 42, borderRadius: 21, marginRight: 10 }} /> : <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: "#F1F2F4", alignItems: "center", justifyContent: "center", marginRight: 10 }}><Ionicons name="person" size={21} color="#9299A3" /></View>}
@@ -1749,9 +1770,11 @@ export default function App() {
               {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? <Pressable style={styles.publishButton} onPress={() => openChat(selectedListing)}>
                 <Text style={styles.publishButtonText}>Написать продавцу</Text>
               </Pressable> : null}
-              {selectedListing?.phone ? <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={() => Linking.openURL(`tel:${selectedListing.phone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
+              {selectedListing?.userId && selectedListing.userId !== session?.user?.id ? (revealedPhone ? <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={() => Linking.openURL(`tel:${revealedPhone}`).catch(() => Alert.alert("Ошибка", "Не удалось открыть приложение телефона."))}>
                 <Text style={styles.publishButtonText}>Позвонить продавцу</Text>
-              </Pressable> : null}
+              </Pressable> : <Pressable style={[styles.publishButton, { backgroundColor: "#20242B" }]} onPress={revealSellerPhone} disabled={phoneRevealLoading}>
+                {phoneRevealLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.publishButtonText}>Показать номер</Text>}
+              </Pressable>) : null}
             </ScrollView>
           </View>
         </View>
