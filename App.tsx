@@ -810,20 +810,14 @@ export default function App() {
 
   const markConversationRead = async (conversationId: string) => {
     if (!session?.user?.id) return;
-    const { data: chat, error } = await supabase
-      .from("conversations")
-      .select("buyer_id, seller_id")
-      .eq("id", conversationId)
-      .single();
-    if (error || !chat) return;
-    const readField = chat.buyer_id === session.user.id
-      ? "buyer_last_read_at"
-      : "seller_last_read_at";
-    const { error: updateError } = await supabase
-      .from("conversations")
-      .update({ [readField]: new Date().toISOString() })
-      .eq("id", conversationId);
-    if (!updateError) await loadUnreadCount();
+    const { error } = await supabase.rpc("mark_conversation_read", {
+      p_conversation_id: conversationId,
+    });
+    if (!error) {
+      await loadUnreadCount();
+    } else {
+      console.error("Не удалось отметить переписку прочитанной:", error.message);
+    }
   };
 
   const loadConversations = async () => {
