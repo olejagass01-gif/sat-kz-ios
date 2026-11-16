@@ -18,6 +18,8 @@ import {
   Image,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as ExpoLinking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
@@ -344,6 +346,32 @@ export default function App() {
     syncAuthRefresh(AppState.currentState);
     const subscription = AppState.addEventListener("change", syncAuthRefresh);
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    let mounted = true;
+    const handleAuthUrl = async (url: string | null) => {
+      if (!url || !url.startsWith("satkz://")) return;
+      const { error } = await supabase.auth.exchangeCodeForSession(url);
+      if (mounted && error) {
+        Alert.alert("Ошибка входа", error.message);
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (mounted) void handleAuthUrl(url);
+    });
+
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      void handleAuthUrl(url);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -950,13 +978,34 @@ export default function App() {
 
   const signInWithGoogle = async () => {
     setAuthBusy(true);
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = Platform.OS === "web"
+      ? "https://sat-kz.vercel.app/"
+      : ExpoLinking.createURL("auth/callback", { scheme: "satkz" });
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: "https://sat-kz.vercel.app/" },
+      options: {
+        redirectTo,
+        ...(Platform.OS !== "web" ? { skipBrowserRedirect: true } : {}),
+      },
     });
+
     if (error) {
       setAuthBusy(false);
       Alert.alert("Ошибка входа", error.message);
+      return;
+    }
+
+    if (Platform.OS !== "web" && data.url) {
+      try {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === "success" && result.url) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(result.url);
+          if (exchangeError) Alert.alert("Ошибка входа", exchangeError.message);
+        }
+      } catch (browserError: any) {
+        Alert.alert("Ошибка входа", browserError?.message || "Не удалось открыть окно авторизации.");
+      }
+      setAuthBusy(false);
     }
   };
 
@@ -967,9 +1016,12 @@ export default function App() {
       return;
     }
     setAuthBusy(true);
+    const emailRedirectTo = Platform.OS === "web"
+      ? "https://sat-kz.vercel.app/"
+      : ExpoLinking.createURL("auth/callback", { scheme: "satkz" });
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: "https://sat-kz.vercel.app/" },
+      options: { emailRedirectTo },
     });
     setAuthBusy(false);
     if (error) {
