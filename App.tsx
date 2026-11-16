@@ -255,6 +255,8 @@ export default function App() {
   const [adPhone, setAdPhone] = useState("");
   const [savingAd, setSavingAd] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
@@ -386,10 +388,29 @@ export default function App() {
     }
   };
 
-  const isAdmin = (session?.user?.email || "").toLowerCase() === "jazira.76.alimhanova@gmail.com";
+  useEffect(() => {
+    let active = true;
+    setIsAdmin(false);
+    setAdminCheckComplete(false);
+
+    if (!session?.user?.id) {
+      setAdminCheckComplete(true);
+      return () => { active = false; };
+    }
+
+    const checkAdmin = async () => {
+      const { data, error } = await supabase.rpc("is_admin");
+      if (!active) return;
+      setIsAdmin(!error && data === true);
+      setAdminCheckComplete(true);
+    };
+
+    checkAdmin();
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (!session?.user?.id || isAdmin) return;
+    if (!session?.user?.id || !adminCheckComplete || isAdmin) return;
     let active = true;
     const checkAccountBan = async () => {
       const { data, error } = await supabase.from("user_bans").select("banned_until, is_permanent").eq("user_id", session.user.id).maybeSingle();
@@ -402,7 +423,7 @@ export default function App() {
     };
     checkAccountBan();
     return () => { active = false; };
-  }, [session?.user?.id, isAdmin]);
+  }, [session?.user?.id, isAdmin, adminCheckComplete]);
 
   const loadAdminReports = async () => {
     if (!isAdmin) return;
